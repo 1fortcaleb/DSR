@@ -1,5 +1,28 @@
 export type Audience = "rep" | "buyer";
-export type RoomView = "case" | "files" | "videos";
+export type RoomView = "case" | "files" | "videos" | "manage";
+
+/**
+ * Rooms serve two relationship types. The shape is identical; only the
+ * vocabulary differs (a "buyer" on a deal is a "partner" on a partnership),
+ * so the distinction is a field rather than a separate model.
+ */
+export type RoomKind = "deal" | "partnership";
+export type RoomStatus = "draft" | "live" | "archived";
+
+export interface RoomParty {
+  name: string;
+  title: string;
+  org: string;
+}
+
+export interface RoomAccount {
+  /** The counterparty organisation the room is prepared for. */
+  company: string;
+  /** Person on the other side — buyer on a deal, partner contact on a partnership. */
+  counterparty: RoomParty;
+  /** Owner of the room on our side. */
+  owner: RoomParty;
+}
 export type DocExt = "PDF" | "XLSX" | "DOCX";
 export type DocGroup = "Built for you" | "From Meridian" | "From 1Fort";
 
@@ -116,4 +139,25 @@ export interface RoomVideo {
   watched: string;
   pct: number;
   note: string;
+}
+
+/** One deal room or partner room, with all of its content. */
+export interface Room {
+  id: string;
+  kind: RoomKind;
+  status: RoomStatus;
+  /** Internal label for the rooms index; not shown to the counterparty. */
+  name: string;
+  account: RoomAccount;
+  content: CaseContent;
+  sources: GeneratedSource[];
+  documents: RoomDocument[];
+  videos: RoomVideo[];
+  /** Recorded videos not yet surfaced in the room. */
+  library: RoomVideo[];
+  curatedVideoIds: string[];
+  engagement: EngagementRow[];
+  /** ISO timestamp; rendered as a relative label. Real telemetry once a backend exists. */
+  lastViewedAt: string | null;
+  updatedAt: string;
 }

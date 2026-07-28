@@ -3,35 +3,41 @@ import { Sidebar } from "./components/Sidebar";
 import { CaseView } from "./components/CaseView";
 import { FilesView } from "./components/FilesView";
 import { VideosView } from "./components/VideosView";
-import { VIDEOS } from "./data/salesRoom";
-import { useDealRoom } from "./hooks/useDealRoom";
+import { ManageView } from "./components/manage/ManageView";
+import { RoomsProvider, useRooms } from "./context/RoomsContext";
 import type { Audience, RoomView } from "./types";
 
-function App() {
+function Room() {
   const [audience, setAudience] = useState<Audience>("rep");
   const [view, setView] = useState<RoomView>("case");
-  const [curatedIds, setCuratedIds] = useState(VIDEOS.map((v) => v.id));
-  // Lives here so rep edits survive switching between views.
-  const room = useDealRoom("Meridian Risk Partners");
+  const { activeRoom } = useRooms();
+
+  // The CMS is rep-only; flipping to the counterparty view leaves it.
+  const effectiveView: RoomView = audience === "buyer" && view === "manage" ? "case" : view;
 
   return (
     <div className="grid min-h-screen min-w-[1440px] grid-cols-[268px_1fr] bg-white">
       <Sidebar
         audience={audience}
         setAudience={setAudience}
-        view={view}
+        view={effectiveView}
         setView={setView}
-        curatedCount={curatedIds.length}
+        curatedCount={activeRoom.curatedVideoIds.length}
       />
       <main className="min-w-0 bg-panel">
-        {view === "case" && <CaseView audience={audience} room={room} />}
-        {view === "files" && <FilesView audience={audience} />}
-        {view === "videos" && (
-          <VideosView audience={audience} curatedIds={curatedIds} setCuratedIds={setCuratedIds} />
-        )}
+        {effectiveView === "case" && <CaseView audience={audience} />}
+        {effectiveView === "files" && <FilesView audience={audience} />}
+        {effectiveView === "videos" && <VideosView audience={audience} />}
+        {effectiveView === "manage" && <ManageView />}
       </main>
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <RoomsProvider>
+      <Room />
+    </RoomsProvider>
+  );
+}

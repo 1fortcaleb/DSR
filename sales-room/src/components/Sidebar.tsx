@@ -1,5 +1,7 @@
 import type { Audience, RoomView } from "../types";
-import { ChatIcon, DocIcon, FolderIcon, UsersIcon, VideoIcon } from "./icons";
+import { useRooms } from "../context/RoomsContext";
+import { firstName, relativeTime } from "../lib/vocabulary";
+import { ChatIcon, DocIcon, FolderIcon, SlidersIcon, UsersIcon, VideoIcon } from "./icons";
 import logo from "../assets/logo-1fort.png";
 
 interface SidebarProps {
@@ -10,31 +12,53 @@ interface SidebarProps {
   curatedCount: number;
 }
 
+/** Two-letter avatar initials; falls back to a dash for an unset contact. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "—";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
 const navLabel = "flex items-center justify-between gap-3 w-full bg-transparent border-none py-2 font-sans text-[13.5px] cursor-pointer text-left transition-colors";
 
 export function Sidebar({ audience, setAudience, view, setView, curatedCount }: SidebarProps) {
   const isRep = audience === "rep";
+  const { activeRoom, vocabulary } = useRooms();
+  const { account } = activeRoom;
+  const contactFirstName = firstName(account.counterparty.name) || "they";
 
   return (
     <aside className="sticky top-0 flex h-screen flex-col gap-[34px] border-r border-border px-[22px] pt-7 pb-8 box-border">
       <div className="flex items-center gap-2.5">
         <img src={logo} alt="1Fort" className="h-5 w-auto" />
         <span className="border-l border-border pl-2.5 font-mono text-[10px] tracking-[0.1em] text-faint uppercase">
-          Sales room
+          {vocabulary.roomNoun}
         </span>
       </div>
 
       <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-[3px]">
-          <div className="text-[19px] font-bold tracking-[-0.01em] text-navy">Meridian Risk Partners</div>
-          <div className="text-xs text-muted">Prepared with Dana Whitfield, COO</div>
+          <div className="text-[19px] font-bold tracking-[-0.01em] text-navy">{account.company}</div>
+          <div className="text-xs text-muted">
+            {account.counterparty.name
+              ? `Prepared with ${account.counterparty.name}${account.counterparty.title ? `, ${account.counterparty.title}` : ""}`
+              : "No contact set"}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded bg-green-bg px-[9px] py-1 text-[11px] font-bold text-green">
-            <span className="h-[5px] w-[5px] rounded-full bg-live" />
-            Live
+          <span
+            className={`inline-flex items-center gap-1.5 rounded px-[9px] py-1 text-[11px] font-bold ${
+              activeRoom.status === "live" ? "bg-green-bg text-green" : "bg-gray-100 text-muted"
+            }`}
+          >
+            <span
+              className={`h-[5px] w-[5px] rounded-full ${
+                activeRoom.status === "live" ? "bg-live" : "bg-faintest"
+              }`}
+            />
+            {activeRoom.status === "live" ? "Live" : activeRoom.status === "draft" ? "Draft" : "Archived"}
           </span>
-          <span className="text-[11px] text-faint">Last viewed 2h ago</span>
+          <span className="text-[11px] text-faint">{relativeTime(activeRoom.lastViewedAt)}</span>
         </div>
       </div>
 
@@ -55,13 +79,13 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
               !isRep ? "bg-white text-navy shadow-sm" : "bg-transparent text-faint"
             }`}
           >
-            Buyer
+            {vocabulary.counterparty}
           </button>
         </div>
         <div className="text-[10.5px] leading-[1.45] text-faint">
           {isRep
-            ? "You see engagement data, the video library and edit controls."
-            : "Exactly what Dana Whitfield sees when she opens the link."}
+            ? vocabulary.audienceHintRep
+            : vocabulary.audienceHintOther(contactFirstName)}
         </div>
       </div>
 
@@ -85,7 +109,9 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
             <FolderIcon className="flex-none" />
             Documents
           </span>
-          <span className={`font-mono text-[10px] ${view === "files" ? "text-navy" : "text-faint"}`}>6</span>
+          <span className={`font-mono text-[10px] ${view === "files" ? "text-navy" : "text-faint"}`}>
+            {activeRoom.documents.length}
+          </span>
         </button>
         <button
           onClick={() => setView("videos")}
@@ -99,6 +125,17 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
             {curatedCount}
           </span>
         </button>
+        {isRep && (
+          <button
+            onClick={() => setView("manage")}
+            className={`${navLabel} hover:text-navy ${view === "manage" ? "font-bold text-navy" : "font-normal text-muted"}`}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <SlidersIcon className="flex-none" />
+              Manage content
+            </span>
+          </button>
+        )}
       </nav>
 
       <div className="mt-auto flex flex-col gap-3.5">
@@ -106,15 +143,19 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2.5">
             <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full bg-navy text-[10px] font-bold text-white">
-              RM
+              {initialsOf(account.owner.name)}
             </span>
-            <span className="text-xs text-body">Rachel Moss · 1Fort</span>
+            <span className="text-xs text-body">
+              {account.owner.name} · {account.owner.org}
+            </span>
           </div>
           <div className="flex items-center gap-2.5">
             <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full bg-blue-bg-soft text-[10px] font-bold text-blue">
-              DW
+              {initialsOf(account.counterparty.name)}
             </span>
-            <span className="text-xs text-body">Dana Whitfield · Meridian</span>
+            <span className="text-xs text-body">
+              {account.counterparty.name || "No contact"} · {account.counterparty.org}
+            </span>
           </div>
         </div>
         {isRep ? (
@@ -125,7 +166,7 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
         ) : (
           <button className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-white px-3 py-[9px] font-sans text-xs font-bold text-gray-800 cursor-pointer transition-all hover:border-faintest hover:bg-row-hover">
             <ChatIcon />
-            Ask Rachel a question
+            Ask {firstName(account.owner.name)} a question
           </button>
         )}
       </div>

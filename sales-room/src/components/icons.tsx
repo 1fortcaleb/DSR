@@ -136,3 +136,14 @@ export function PlayIcon({ size = 14, className }: IconProps) {
     </svg>
   );
 }
+
+export function SlidersIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={1.6} className={className} {...strokeProps}>
+      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="16" cy="18" r="2" />
+    </svg>
+  );
+}

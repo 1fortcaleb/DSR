@@ -1,0 +1,59 @@
+import type { RoomKind } from "../types";
+
+/**
+ * Wording that differs between relationship types. Everything user-facing that
+ * says "buyer" goes through here, so a partner room never reads like a sales
+ * pitch aimed at a prospect.
+ */
+export interface Vocabulary {
+  roomNoun: string;
+  /** The non-rep audience, title case. */
+  counterparty: string;
+  counterpartyLower: string;
+  engagementLabel: string;
+  audienceHintRep: string;
+  /** Takes the counterparty's first name. */
+  audienceHintOther: (name: string) => string;
+}
+
+const VOCABULARY: Record<RoomKind, Vocabulary> = {
+  deal: {
+    roomNoun: "Deal room",
+    counterparty: "Buyer",
+    counterpartyLower: "buyer",
+    engagementLabel: "Buyer engagement",
+    audienceHintRep: "You see engagement data, the video library and edit controls.",
+    audienceHintOther: (name) => `Exactly what ${name} sees when they open the link.`,
+  },
+  partnership: {
+    roomNoun: "Partner room",
+    counterparty: "Partner",
+    counterpartyLower: "partner",
+    engagementLabel: "Partner engagement",
+    audienceHintRep: "You see engagement data, the video library and edit controls.",
+    audienceHintOther: (name) => `Exactly what ${name} sees when they open the link.`,
+  },
+};
+
+export function vocabularyFor(kind: RoomKind): Vocabulary {
+  return VOCABULARY[kind];
+}
+
+/** First name, for the conversational copy above. */
+export function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] ?? fullName;
+}
+
+/** Coarse relative time. Real telemetry replaces the source, not this formatter. */
+export function relativeTime(iso: string | null): string {
+  if (!iso) return "Not opened yet";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "Not opened yet";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "Viewed just now";
+  if (mins < 60) return `Last viewed ${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `Last viewed ${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `Last viewed ${days}d ago`;
+}

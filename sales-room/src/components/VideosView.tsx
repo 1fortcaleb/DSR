@@ -1,35 +1,35 @@
 import { useState } from "react";
 import type { Audience } from "../types";
-import { LIBRARY, VIDEOS } from "../data/salesRoom";
+import { useRooms } from "../context/RoomsContext";
 import { ImagePlaceholder } from "./ImagePlaceholder";
 import { PlusIcon, RecordIcon, XIcon } from "./icons";
 
 interface VideosViewProps {
   audience: Audience;
-  curatedIds: string[];
-  setCuratedIds: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-const ALL_VIDEOS = [...VIDEOS, ...LIBRARY];
-
-export function VideosView({ audience, curatedIds, setCuratedIds }: VideosViewProps) {
+export function VideosView({ audience }: VideosViewProps) {
   const isRep = audience === "rep";
-  const [videoId, setVideoId] = useState(VIDEOS[0].id);
+  const { activeRoom, updateRoom } = useRooms();
+  const allVideos = [...activeRoom.videos, ...activeRoom.library];
+  const curatedIds = activeRoom.curatedVideoIds;
+  const setCuratedIds = (next: string[]) => updateRoom(activeRoom.id, { curatedVideoIds: next });
+  const [videoId, setVideoId] = useState<string | null>(null);
 
-  const curated = curatedIds.map((id) => ALL_VIDEOS.find((v) => v.id === id)).filter((v) => v !== undefined);
-  const library = LIBRARY.filter((v) => !curatedIds.includes(v.id));
-  const video = ALL_VIDEOS.find((v) => v.id === videoId) ?? curated[0] ?? VIDEOS[0];
+  const curated = curatedIds.map((id) => allVideos.find((v) => v.id === id)).filter((v) => v !== undefined);
+  const library = activeRoom.library.filter((v) => !curatedIds.includes(v.id));
+  const video = allVideos.find((v) => v.id === videoId) ?? curated[0];
+
+  const hasAny = curated.length > 0 || library.length > 0;
 
   function removeFromRoom(id: string) {
-    setCuratedIds((prev) => {
-      const next = prev.filter((x) => x !== id);
-      if (videoId === id) setVideoId(next[0] ?? "");
-      return next;
-    });
+    const next = curatedIds.filter((x) => x !== id);
+    setCuratedIds(next);
+    if (videoId === id) setVideoId(next[0] ?? null);
   }
 
   function addToRoom(id: string) {
-    setCuratedIds((prev) => [...prev, id]);
+    setCuratedIds([...curatedIds, id]);
     setVideoId(id);
   }
 
@@ -41,7 +41,7 @@ export function VideosView({ audience, curatedIds, setCuratedIds }: VideosViewPr
           <h2 className="m-0 text-[30px] font-bold tracking-[-0.02em] text-navy">Asked &amp; answered</h2>
           <p className="m-0 text-[13px] text-muted">
             {isRep
-              ? `Curated by Rachel Moss. Only these ${curated.length} are visible to Meridian — everything else stays in the library.`
+              ? `Curated by ${activeRoom.account.owner.name}. Only these ${curated.length} are visible to ${activeRoom.account.company} — everything else stays in the library.`
               : "Short answers from the 1Fort team to the questions you raised. Watch in any order."}
           </p>
         </div>
@@ -53,6 +53,15 @@ export function VideosView({ audience, curatedIds, setCuratedIds }: VideosViewPr
         )}
       </header>
 
+      {!hasAny && (
+        <p className="m-0 text-[13px] text-muted">
+          {isRep
+            ? "No videos in this room yet. Add them from Manage content."
+            : "No video answers have been shared here yet."}
+        </p>
+      )}
+
+      {video && (
       <section className="grid grid-cols-[minmax(0,1.55fr)_minmax(280px,1fr)] items-start gap-7">
         <div className="relative w-full overflow-hidden rounded-xl border border-border bg-gray-100 aspect-video">
           <ImagePlaceholder
@@ -103,7 +112,9 @@ export function VideosView({ audience, curatedIds, setCuratedIds }: VideosViewPr
           )}
         </div>
       </section>
+      )}
 
+      {curated.length > 0 && (
       <section className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between border-b-2 border-border-soft pb-2.5">
           <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">
@@ -163,14 +174,15 @@ export function VideosView({ audience, curatedIds, setCuratedIds }: VideosViewPr
           ))}
         </div>
       </section>
+      )}
 
-      {isRep && (
+      {isRep && library.length > 0 && (
         <section className="flex flex-col gap-4">
           <div className="flex items-baseline justify-between border-b-2 border-border-soft pb-2.5">
             <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">
               Suggested for this deal
             </span>
-            <span className="text-[11px] italic text-faint">{library.length} in the library, hidden from Meridian</span>
+            <span className="text-[11px] italic text-faint">{library.length} in the library, hidden from {activeRoom.account.company}</span>
           </div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3">
             {library.map((sug) => (

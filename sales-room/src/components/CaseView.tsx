@@ -1,21 +1,20 @@
 import type { Audience } from "../types";
-import type { DealRoom } from "../hooks/useDealRoom";
-import { ENGAGEMENT } from "../data/caseContent";
+import { useRooms } from "../context/RoomsContext";
+import { firstName } from "../lib/vocabulary";
 import { CheckIcon, RefreshIcon, SparkleIcon } from "./icons";
 import { EditableText } from "./EditableText";
 
 interface CaseViewProps {
   audience: Audience;
-  room: DealRoom;
 }
 
-export function CaseView({ audience, room }: CaseViewProps) {
+export function CaseView({ audience }: CaseViewProps) {
   const isRep = audience === "rep";
   const {
-    content,
+    activeRoom,
+    vocabulary,
     setField,
     setListItem,
-    sources,
     toggleSource,
     renameSource,
     status,
@@ -23,7 +22,8 @@ export function CaseView({ audience, room }: CaseViewProps) {
     isLive,
     regenerate,
     dismissError,
-  } = room;
+  } = useRooms();
+  const { content, sources, engagement, account } = activeRoom;
 
   // Buyers see the same page, rendered inert.
   const ro = !isRep;
@@ -325,11 +325,11 @@ export function CaseView({ audience, room }: CaseViewProps) {
             <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">Your contact</span>
             <div className="flex items-center gap-2.5">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">
-                RM
+                {initials(account.owner.name)}
               </span>
               <span className="flex flex-col">
-                <span className="text-[12.5px] font-bold text-gray-900">Rachel Moss</span>
-                <span className="text-[11px] text-faint">1Fort · replies same day</span>
+                <span className="text-[12.5px] font-bold text-gray-900">{account.owner.name}</span>
+                <span className="text-[11px] text-faint">{account.owner.org} · replies same day</span>
               </span>
             </div>
             <p className="m-0 text-[11.5px] leading-[1.55] text-muted">
@@ -410,9 +410,11 @@ export function CaseView({ audience, room }: CaseViewProps) {
           </div>
 
           <div className="flex flex-col gap-3.5 rounded-[10px] border border-border bg-white p-5">
-            <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">Buyer engagement</span>
+            <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">
+              {vocabulary.engagementLabel}
+            </span>
             <div className="flex flex-col gap-3">
-              {ENGAGEMENT.map((e) => (
+              {engagement.map((e) => (
                 <div key={e.id} className="flex flex-col gap-1.5">
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs text-body">{e.label}</span>
@@ -428,7 +430,9 @@ export function CaseView({ audience, room }: CaseViewProps) {
               ))}
             </div>
             <p className="m-0 text-[11px] leading-[1.5] text-muted">
-              Dana forwarded this to a CFO on Jul 24. Two unseen viewers since.
+              {engagement.length
+                ? `${firstName(account.counterparty.name) || "They"} last opened this ${vocabulary.counterpartyLower === "partner" ? "partner" : "deal"} room recently.`
+                : "No engagement recorded yet."}
             </p>
           </div>
 
@@ -444,4 +448,11 @@ export function CaseView({ audience, room }: CaseViewProps) {
       )}
     </div>
   );
+}
+
+/** Two-letter avatar initials. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "—";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }

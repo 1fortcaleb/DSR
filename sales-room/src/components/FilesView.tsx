@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Audience, DocExt } from "../types";
-import { DOCUMENTS, DOCUMENT_GROUP_ORDER } from "../data/salesRoom";
+import { DOCUMENT_GROUP_ORDER } from "../data/salesRoom";
+import { useRooms } from "../context/RoomsContext";
 import { DownloadIcon, LockIcon, PlusIcon, SearchIcon, SparkleIcon } from "./icons";
 
 interface FilesViewProps {
@@ -15,8 +16,25 @@ const chipColor: Record<DocExt, string> = {
 
 export function FilesView({ audience }: FilesViewProps) {
   const isRep = audience === "rep";
-  const [activeId, setActiveId] = useState(DOCUMENTS[1].id);
-  const active = DOCUMENTS.find((d) => d.id === activeId) ?? DOCUMENTS[0];
+  const { activeRoom } = useRooms();
+  const documents = activeRoom.documents;
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const active = documents.find((d) => d.id === activeId) ?? documents[0];
+
+  if (!active) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex max-w-[320px] flex-col items-center gap-2 text-center">
+          <p className="m-0 text-sm font-bold text-navy">No documents yet</p>
+          <p className="m-0 text-[12.5px] leading-[1.5] text-muted">
+            {isRep
+              ? "Add documents to this room from Manage content."
+              : "Nothing has been shared here yet."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid h-screen grid-cols-[minmax(260px,340px)_minmax(0,1fr)] items-start">
@@ -25,13 +43,13 @@ export function FilesView({ audience }: FilesViewProps) {
           <h2 className="m-0 text-[22px] font-bold tracking-[-0.015em] text-navy">Documents</h2>
           <div className="flex items-center gap-2 rounded-md border border-border px-2.5 py-2">
             <SearchIcon className="text-faint" />
-            <span className="text-xs text-faint">Search all six documents</span>
+            <span className="text-xs text-faint">{`Search all ${documents.length} documents`}</span>
           </div>
         </div>
 
         <div className="flex flex-col">
           {DOCUMENT_GROUP_ORDER.map((label) => {
-            const files = DOCUMENTS.filter((d) => d.group === label);
+            const files = documents.filter((d) => d.group === label);
             return (
               <div key={label} className="flex flex-col">
                 <div className="flex items-center justify-between px-[26px] pt-[18px] pb-2">
@@ -126,7 +144,7 @@ export function FilesView({ audience }: FilesViewProps) {
               </div>
               <p className="m-0 text-[12.5px] leading-[1.7] text-body">{active.body}</p>
               <div className="mt-auto flex items-center justify-between border-t border-border-soft pt-4">
-                <span className="text-[10px] text-faint">Meridian Risk Partners · Confidential</span>
+                <span className="text-[10px] text-faint">{activeRoom.account.company} · Confidential</span>
                 <span className="font-mono text-[10px] text-faint">Page 1 of {active.pages}</span>
               </div>
             </div>
@@ -164,7 +182,7 @@ export function FilesView({ audience }: FilesViewProps) {
                       DW
                     </span>
                     <span className="flex flex-col">
-                      <span className="text-xs text-body">Dana Whitfield</span>
+                      <span className="text-xs text-body">{activeRoom.account.counterparty.name}</span>
                       <span className="text-[10.5px] text-faint">4 opens · 6m 12s total</span>
                     </span>
                   </div>
