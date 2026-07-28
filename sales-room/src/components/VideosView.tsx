@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Audience } from "../types";
 import { useRooms } from "../context/RoomsContext";
+import { useAssets } from "../context/AssetsContext";
 import { ImagePlaceholder } from "./ImagePlaceholder";
 import { PlusIcon, RecordIcon, XIcon } from "./icons";
 
@@ -11,6 +12,7 @@ interface VideosViewProps {
 export function VideosView({ audience }: VideosViewProps) {
   const isRep = audience === "rep";
   const { activeRoom, updateRoom } = useRooms();
+  const { byId: assetsById } = useAssets();
   const allVideos = [...activeRoom.videos, ...activeRoom.library];
   const curatedIds = activeRoom.curatedVideoIds;
   const setCuratedIds = (next: string[]) => updateRoom(activeRoom.id, { curatedVideoIds: next });
@@ -65,7 +67,8 @@ export function VideosView({ audience }: VideosViewProps) {
       <section className="grid grid-cols-[minmax(0,1.55fr)_minmax(280px,1fr)] items-start gap-7">
         <div className="relative w-full overflow-hidden rounded-xl border border-border bg-gray-100 aspect-video">
           <ImagePlaceholder
-            label="Drop the opening frame of this recording"
+            label="Attach a poster frame in Manage content → Video answers"
+            posterSrc={video?.posterAssetId ? assetsById.get(video.posterAssetId)?.thumbnail ?? null : null}
             withPlayButton
             duration={video?.dur}
           />
@@ -136,7 +139,12 @@ export function VideosView({ audience }: VideosViewProps) {
               }`}
             >
               <div className="relative aspect-video bg-gray-100">
-                <ImagePlaceholder label={tile.placeholder} withPlayButton duration={tile.dur} />
+                <ImagePlaceholder
+                  label={tile.placeholder}
+                  posterSrc={tile.posterAssetId ? assetsById.get(tile.posterAssetId)?.thumbnail ?? null : null}
+                  withPlayButton
+                  duration={tile.dur}
+                />
                 {isRep && (
                   <button
                     onClick={(e) => {

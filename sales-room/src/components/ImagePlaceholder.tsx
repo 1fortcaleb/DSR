@@ -2,26 +2,31 @@ import { PlayIcon } from "./icons";
 
 interface ImagePlaceholderProps {
   label: string;
+  /** Thumbnail of an attached poster asset; falls back to the label when absent. */
+  posterSrc?: string | null;
   withPlayButton?: boolean;
   duration?: string;
   className?: string;
 }
 
 /**
- * Static stand-in for the original `<image-slot>` editor element, which
- * relied on the Claude Design sandbox to let a user drop in a real image.
- * Outside that sandbox there is no host to fill the slot, so this renders
- * a plain placeholder — swap in a real <img> once assets exist.
+ * Renders an attached poster asset when one exists, otherwise a prompt telling
+ * the rep where to attach one. Replaces the original sandbox `<image-slot>`.
  */
 export function ImagePlaceholder({
   label,
+  posterSrc,
   withPlayButton,
   duration,
   className,
 }: ImagePlaceholderProps) {
   return (
     <div className={`relative flex h-full w-full items-center justify-center bg-gray-100 ${className ?? ""}`}>
-      <span className="max-w-[80%] text-center text-xs text-faint">{label}</span>
+      {posterSrc ? (
+        <img src={posterSrc} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className="max-w-[80%] text-center text-xs text-faint">{label}</span>
+      )}
       {withPlayButton && (
         <div className="pointer-events-none absolute bottom-3 left-3 flex items-center justify-center">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-navy/70">

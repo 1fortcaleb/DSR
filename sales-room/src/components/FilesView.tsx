@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Audience, DocExt } from "../types";
 import { DOCUMENT_GROUP_ORDER } from "../data/salesRoom";
 import { useRooms } from "../context/RoomsContext";
+import { useAssets } from "../context/AssetsContext";
 import { DownloadIcon, LockIcon, PlusIcon, SearchIcon, SparkleIcon } from "./icons";
 
 interface FilesViewProps {
@@ -17,6 +18,7 @@ const chipColor: Record<DocExt, string> = {
 export function FilesView({ audience }: FilesViewProps) {
   const isRep = audience === "rep";
   const { activeRoom } = useRooms();
+  const { byId: assetsById } = useAssets();
   const documents = activeRoom.documents;
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = documents.find((d) => d.id === activeId) ?? documents[0];
@@ -66,11 +68,22 @@ export function FilesView({ audience }: FilesViewProps) {
                         isActive ? "bg-blue-bg shadow-[inset_2px_0_0_#2280EE]" : ""
                       }`}
                     >
-                      <span
-                        className={`inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-md border border-border bg-white font-mono text-[8px] tracking-[0.04em] font-medium ${chipColor[file.ext]}`}
-                      >
-                        {file.ext}
-                      </span>
+                      {(() => {
+                        const thumb = file.assetId ? assetsById.get(file.assetId)?.thumbnail : null;
+                        return thumb ? (
+                          <img
+                            src={thumb}
+                            alt=""
+                            className="h-[34px] w-[34px] flex-none rounded-md border border-border object-cover"
+                          />
+                        ) : (
+                          <span
+                            className={`inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-md border border-border bg-white font-mono text-[8px] tracking-[0.04em] font-medium ${chipColor[file.ext]}`}
+                          >
+                            {file.ext}
+                          </span>
+                        );
+                      })()}
                       <span className="flex min-w-0 flex-col gap-1 text-left">
                         <span
                           className={`overflow-hidden text-ellipsis whitespace-nowrap text-[13px] ${

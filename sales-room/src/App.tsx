@@ -5,6 +5,7 @@ import { FilesView } from "./components/FilesView";
 import { VideosView } from "./components/VideosView";
 import { ManageView } from "./components/manage/ManageView";
 import { RoomsProvider, useRooms } from "./context/RoomsContext";
+import { AssetsProvider } from "./context/AssetsContext";
 import type { Audience, RoomView } from "./types";
 
 function Room() {
@@ -36,8 +37,10 @@ function Room() {
 
 export default function App() {
   return (
-    <RoomsProvider>
-      <Room />
-    </RoomsProvider>
+    <AssetsProvider>
+      <RoomsProvider>
+        <Room />
+      </RoomsProvider>
+    </AssetsProvider>
   );
 }

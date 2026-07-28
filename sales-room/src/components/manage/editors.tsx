@@ -2,6 +2,7 @@ import { useRooms } from "../../context/RoomsContext";
 import { relativeTime } from "../../lib/vocabulary";
 import type { RoomKind, RoomStatus } from "../../types";
 import { Button, Grid, ListRow, Section, SelectField, TextField } from "./Field";
+import { AssetPicker } from "./AssetPicker";
 
 /* ------------------------------------------------------------------ account */
 
@@ -435,6 +436,11 @@ export function DocumentsEditor() {
                 onChange={(v) => patchDoc(d.id, { pages: Number(v) || 0 })}
               />
             </Grid>
+            <AssetPicker
+              label="File"
+              assetId={d.assetId}
+              onChange={(assetId) => patchDoc(d.id, { assetId })}
+            />
           </ListRow>
         ))}
       </div>
@@ -459,6 +465,13 @@ export function VideosEditor() {
 
   const setCurated = (ids: string[]) => updateRoom(activeRoom.id, { curatedVideoIds: ids });
 
+  /** A video may live in either list; patch whichever holds it. */
+  const setVideoPoster = (id: string, posterAssetId: string | undefined) =>
+    updateRoom(activeRoom.id, {
+      videos: videos.map((v) => (v.id === id ? { ...v, posterAssetId } : v)),
+      library: library.map((v) => (v.id === id ? { ...v, posterAssetId } : v)),
+    });
+
   const move = (id: string, delta: number) => {
     const i = curatedVideoIds.indexOf(id);
     const j = i + delta;
@@ -478,6 +491,12 @@ export function VideosEditor() {
         <div className="flex flex-col gap-2">
           {inRoom.map((v, i) => (
             <ListRow key={v.id} onRemove={() => setCurated(curatedVideoIds.filter((x) => x !== v.id))}>
+              <AssetPicker
+                label="Poster frame"
+                kind="image"
+                assetId={v.posterAssetId}
+                onChange={(posterAssetId) => setVideoPoster(v.id, posterAssetId)}
+              />
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <div className="flex min-w-0 flex-col">
                   <span className="truncate text-[13px] font-bold text-gray-900">{v.title}</span>

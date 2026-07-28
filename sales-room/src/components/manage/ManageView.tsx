@@ -5,13 +5,15 @@ import type { RoomKind } from "../../types";
 import { CaseView } from "../CaseView";
 import { Button, SelectField, TextField } from "./Field";
 import { AccountEditor, CaseEditor, DocumentsEditor, SourcesEditor, VideosEditor } from "./editors";
+import { AssetsEditor } from "./AssetsEditor";
 
-type SectionId = "account" | "case" | "sources" | "documents" | "videos";
+type SectionId = "account" | "case" | "sources" | "assets" | "documents" | "videos";
 
 const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
   { id: "account", label: "Room & account", hint: "Who this room is for" },
   { id: "case", label: "Business case", hint: "The 1-pager copy" },
   { id: "sources", label: "Sources", hint: "What it generates from" },
+  { id: "assets", label: "Assets", hint: "Files, images and video" },
   { id: "documents", label: "Documents", hint: "Files in the room" },
   { id: "videos", label: "Video answers", hint: "What's visible" },
 ];
@@ -146,6 +148,7 @@ export function ManageView() {
           {section === "account" && <AccountEditor />}
           {section === "case" && <CaseEditor />}
           {section === "sources" && <SourcesEditor />}
+          {section === "assets" && <AssetsEditor />}
           {section === "documents" && <DocumentsEditor />}
           {section === "videos" && <VideosEditor />}
         </div>

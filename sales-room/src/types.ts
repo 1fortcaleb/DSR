@@ -33,6 +33,8 @@ export interface DocRow {
 
 export interface RoomDocument {
   id: string;
+  /** Backing file in the asset library, if one has been attached. */
+  assetId?: string;
   group: DocGroup;
   ext: DocExt;
   name: string;
@@ -130,6 +132,8 @@ export interface VideoChapter {
 
 export interface RoomVideo {
   id: string;
+  /** Poster frame from the asset library. */
+  posterAssetId?: string;
   kicker: string;
   title: string;
   dur: string;
@@ -160,4 +164,25 @@ export interface Room {
   /** ISO timestamp; rendered as a relative label. Real telemetry once a backend exists. */
   lastViewedAt: string | null;
   updatedAt: string;
+}
+
+/* ----------------------------------------------------------------- assets */
+
+export type AssetKind = "image" | "video" | "document";
+/** Uploaded by a rep, or produced by the model once generation is connected. */
+export type AssetOrigin = "uploaded" | "generated";
+
+/** Metadata for one stored file. The bytes live in IndexedDB under the same id. */
+export interface Asset {
+  id: string;
+  name: string;
+  kind: AssetKind;
+  mimeType: string;
+  sizeBytes: number;
+  /** Small data URL used in grids and room tiles; null if none could be made. */
+  thumbnail: string | null;
+  origin: AssetOrigin;
+  /** Prompt that produced a generated asset. */
+  prompt?: string;
+  createdAt: string;
 }
