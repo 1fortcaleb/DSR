@@ -1,10 +1,30 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Audience } from "../types";
 import { CheckIcon, RefreshIcon, SparkleIcon } from "./icons";
+import { EditableText } from "./EditableText";
 
 interface CaseViewProps {
   audience: Audience;
 }
+
+const INITIAL_CASE_CONTENT = {
+  headline: "Take 11 days out of every submission at Meridian.",
+  despite: "[email + spreadsheet submissions]",
+  cant: "[quote inside 48 hours]",
+  means: "[your 40 producers]",
+  haveTo: "[rekey one app into six portals]",
+  cost: "[$1.4M of unwritten premium]",
+  statDays: "11.5",
+  statPortals: "6",
+  statPercent: "38",
+  statPremium: "$1.4M",
+  yearOneTotal: "$2.1M",
+  hoursReturned: "4,800",
+  platformInvestment: "$96,000",
+  payback: "3.2 months",
+};
+
+type CaseContent = typeof INITIAL_CASE_CONTENT;
 
 const engagement = [
   { label: "Problem framing", time: "3m 40s", pct: 82 },
@@ -22,6 +42,11 @@ const sources = [
 export function CaseView({ audience }: CaseViewProps) {
   const isRep = audience === "rep";
   const [regenerating, setRegenerating] = useState(false);
+  const [content, setContent] = useState<CaseContent>(INITIAL_CASE_CONTENT);
+
+  function setField<K extends keyof CaseContent>(key: K) {
+    return (next: string) => setContent((prev) => ({ ...prev, [key]: next }));
+  }
 
   function regenerate() {
     setRegenerating(true);
@@ -39,9 +64,14 @@ export function CaseView({ audience }: CaseViewProps) {
               </span>
               <span className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase">1 of 1</span>
             </div>
-            <h1 className="m-0 max-w-[15em] text-[40px] leading-[1.1] tracking-[-0.025em] font-bold text-navy">
-              Take 11 days out of every submission at Meridian.
-            </h1>
+            <EditableText
+              as="h1"
+              value={content.headline}
+              onChange={setField("headline")}
+              fullWidth
+              ariaLabel="Headline"
+              className="m-0 max-w-[15em] text-[40px] leading-[1.1] tracking-[-0.025em] font-bold text-navy"
+            />
             <div className="h-1 w-[30px] rounded-full bg-blue" />
           </header>
 
@@ -49,19 +79,50 @@ export function CaseView({ audience }: CaseViewProps) {
             <span className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase">Problem framing</span>
             <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono text-[21px] leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase">
               <div>
-                Despite <span className="text-blue">[email + spreadsheet submissions]</span>
+                Despite{" "}
+                <EditableText
+                  value={content.despite}
+                  onChange={setField("despite")}
+                  className="text-blue"
+                  ariaLabel="Problem framing: despite"
+                />
               </div>
               <div>
-                we still can't <span className="text-blue">[quote inside 48 hours]</span>
+                we still can't{" "}
+                <EditableText
+                  value={content.cant}
+                  onChange={setField("cant")}
+                  className="text-blue"
+                  ariaLabel="Problem framing: can't"
+                />
               </div>
               <div>
-                which means <span className="text-blue">[your 40 producers]</span>
+                which means{" "}
+                <EditableText
+                  value={content.means}
+                  onChange={setField("means")}
+                  className="text-blue"
+                  ariaLabel="Problem framing: means"
+                />
               </div>
               <div>
-                have to <span className="text-blue">[rekey one app into six portals]</span>
+                have to{" "}
+                <EditableText
+                  value={content.haveTo}
+                  onChange={setField("haveTo")}
+                  className="text-blue"
+                  ariaLabel="Problem framing: have to"
+                />
               </div>
               <div>
-                the cost is <span className="text-blue">[$1.4M of unwritten premium]</span>.
+                the cost is{" "}
+                <EditableText
+                  value={content.cost}
+                  onChange={setField("cost")}
+                  className="text-blue"
+                  ariaLabel="Problem framing: cost"
+                />
+                .
               </div>
             </div>
           </section>
@@ -74,10 +135,27 @@ export function CaseView({ audience }: CaseViewProps) {
               <span className="text-[11px] italic text-faint">From Meridian's 2025 production report</span>
             </div>
             <div className="grid grid-cols-4 gap-[26px]">
-              <Stat value="11.5" unit="days" label="Median submission to first quote" />
-              <Stat value="6" unit="portals" label="Rekeyed per cyber account" />
-              <Stat value="38" unit="%" label="Submissions never quoted out" accent="text-red" />
-              <Stat value="$1.4M" label="Annual premium left unwritten" accent="text-red" />
+              <Stat
+                value={<EditableText value={content.statDays} onChange={setField("statDays")} ariaLabel="Median submission to first quote" />}
+                unit="days"
+                label="Median submission to first quote"
+              />
+              <Stat
+                value={<EditableText value={content.statPortals} onChange={setField("statPortals")} ariaLabel="Rekeyed per cyber account" />}
+                unit="portals"
+                label="Rekeyed per cyber account"
+              />
+              <Stat
+                value={<EditableText value={content.statPercent} onChange={setField("statPercent")} ariaLabel="Submissions never quoted out" />}
+                unit="%"
+                label="Submissions never quoted out"
+                accent="text-red"
+              />
+              <Stat
+                value={<EditableText value={content.statPremium} onChange={setField("statPremium")} ariaLabel="Annual premium left unwritten" />}
+                label="Annual premium left unwritten"
+                accent="text-red"
+              />
             </div>
           </section>
 
@@ -109,14 +187,26 @@ export function CaseView({ audience }: CaseViewProps) {
             <div className="flex flex-col gap-[18px] rounded-lg bg-row-hover px-6 pt-6 pb-[22px]">
               <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">Year one</span>
               <div className="flex flex-col gap-[3px]">
-                <div className="text-[38px] leading-none font-bold tracking-[-0.03em] text-navy">$2.1M</div>
+                <div className="text-[38px] leading-none font-bold tracking-[-0.03em] text-navy">
+                  <EditableText value={content.yearOneTotal} onChange={setField("yearOneTotal")} ariaLabel="Year one incremental written premium" />
+                </div>
                 <div className="text-xs text-muted">Incremental written premium</div>
               </div>
               <div className="h-px bg-border" />
               <div className="flex flex-col gap-3">
-                <Row label="Producer hours returned" value="4,800" />
-                <Row label="Platform investment" value="$96,000" />
-                <Row label="Payback" value="3.2 months" valueClass="text-green" />
+                <Row
+                  label="Producer hours returned"
+                  value={<EditableText value={content.hoursReturned} onChange={setField("hoursReturned")} ariaLabel="Producer hours returned" />}
+                />
+                <Row
+                  label="Platform investment"
+                  value={<EditableText value={content.platformInvestment} onChange={setField("platformInvestment")} ariaLabel="Platform investment" />}
+                />
+                <Row
+                  label="Payback"
+                  value={<EditableText value={content.payback} onChange={setField("payback")} ariaLabel="Payback period" />}
+                  valueClass="text-green"
+                />
               </div>
               <p className="m-0 text-[10px] leading-[1.5] italic text-faint">
                 Modeled on your 2025 cyber and E&amp;O volume at a 12% hit-rate lift. Full model in Documents.
@@ -241,7 +331,7 @@ function Stat({
   label,
   accent = "text-navy",
 }: {
-  value: string;
+  value: ReactNode;
   unit?: string;
   label: string;
   accent?: string;
@@ -257,7 +347,7 @@ function Stat({
   );
 }
 
-function Row({ label, value, valueClass = "text-gray-900" }: { label: string; value: string; valueClass?: string }) {
+function Row({ label, value, valueClass = "text-gray-900" }: { label: string; value: ReactNode; valueClass?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <span className="text-xs text-muted">{label}</span>
