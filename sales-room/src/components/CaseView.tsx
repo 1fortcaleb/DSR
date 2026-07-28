@@ -1,57 +1,32 @@
-import { useState, type ReactNode } from "react";
 import type { Audience } from "../types";
+import type { DealRoom } from "../hooks/useDealRoom";
+import { ENGAGEMENT } from "../data/caseContent";
 import { CheckIcon, RefreshIcon, SparkleIcon } from "./icons";
 import { EditableText } from "./EditableText";
 
 interface CaseViewProps {
   audience: Audience;
+  room: DealRoom;
 }
 
-const INITIAL_CASE_CONTENT = {
-  headline: "Take 11 days out of every submission at Meridian.",
-  despite: "[email + spreadsheet submissions]",
-  cant: "[quote inside 48 hours]",
-  means: "[your 40 producers]",
-  haveTo: "[rekey one app into six portals]",
-  cost: "[$1.4M of unwritten premium]",
-  statDays: "11.5",
-  statPortals: "6",
-  statPercent: "38",
-  statPremium: "$1.4M",
-  yearOneTotal: "$2.1M",
-  hoursReturned: "4,800",
-  platformInvestment: "$96,000",
-  payback: "3.2 months",
-};
-
-type CaseContent = typeof INITIAL_CASE_CONTENT;
-
-const engagement = [
-  { label: "Problem framing", time: "3m 40s", pct: 82 },
-  { label: "Year one", time: "2m 05s", pct: 47 },
-  { label: "Next 30 days", time: "18s", pct: 9 },
-];
-
-const sources = [
-  { label: "Discovery call · Jul 14", used: true },
-  { label: "2025 production report", used: true },
-  { label: "Meridian ROI model", used: true },
-  { label: "Carrier appetite notes", used: false },
-];
-
-export function CaseView({ audience }: CaseViewProps) {
+export function CaseView({ audience, room }: CaseViewProps) {
   const isRep = audience === "rep";
-  const [regenerating, setRegenerating] = useState(false);
-  const [content, setContent] = useState<CaseContent>(INITIAL_CASE_CONTENT);
+  const {
+    content,
+    setField,
+    setListItem,
+    sources,
+    toggleSource,
+    renameSource,
+    status,
+    error,
+    isLive,
+    regenerate,
+    dismissError,
+  } = room;
 
-  function setField<K extends keyof CaseContent>(key: K) {
-    return (next: string) => setContent((prev) => ({ ...prev, [key]: next }));
-  }
-
-  function regenerate() {
-    setRegenerating(true);
-    setTimeout(() => setRegenerating(false), 1600);
-  }
+  // Buyers see the same page, rendered inert.
+  const ro = !isRep;
 
   return (
     <div className="flex flex-wrap items-start">
@@ -59,16 +34,27 @@ export function CaseView({ audience }: CaseViewProps) {
         <article className="box-border flex w-full max-w-[880px] flex-col gap-[46px] rounded-[10px] border border-border-soft bg-white px-[68px] pt-16 pb-14 shadow-[0_1px_2px_rgba(0,1,46,0.04),0_30px_60px_-40px_rgba(0,1,46,0.18)]">
           <header className="flex flex-col gap-[26px]">
             <div className="flex items-start justify-between gap-6">
-              <span className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase">
-                Business case · July 27, 2026
-              </span>
-              <span className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase">1 of 1</span>
+              <EditableText
+                readOnly={ro}
+                value={content.kicker}
+                onChange={(v) => setField("kicker", v)}
+                ariaLabel="Document kicker"
+                className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase"
+              />
+              <EditableText
+                readOnly={ro}
+                value={content.pageCount}
+                onChange={(v) => setField("pageCount", v)}
+                ariaLabel="Page count"
+                className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase"
+              />
             </div>
             <EditableText
               as="h1"
-              value={content.headline}
-              onChange={setField("headline")}
+              readOnly={ro}
               fullWidth
+              value={content.headline}
+              onChange={(v) => setField("headline", v)}
               ariaLabel="Headline"
               className="m-0 max-w-[15em] text-[40px] leading-[1.1] tracking-[-0.025em] font-bold text-navy"
             />
@@ -76,160 +62,244 @@ export function CaseView({ audience }: CaseViewProps) {
           </header>
 
           <section className="flex flex-col gap-[22px]">
-            <span className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase">Problem framing</span>
+            <EditableText
+              readOnly={ro}
+              value={content.framingLabel}
+              onChange={(v) => setField("framingLabel", v)}
+              ariaLabel="Problem framing label"
+              className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase"
+            />
             <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono text-[21px] leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase">
-              <div>
-                Despite{" "}
-                <EditableText
-                  value={content.despite}
-                  onChange={setField("despite")}
-                  className="text-blue"
-                  ariaLabel="Problem framing: despite"
-                />
-              </div>
-              <div>
-                we still can't{" "}
-                <EditableText
-                  value={content.cant}
-                  onChange={setField("cant")}
-                  className="text-blue"
-                  ariaLabel="Problem framing: can't"
-                />
-              </div>
-              <div>
-                which means{" "}
-                <EditableText
-                  value={content.means}
-                  onChange={setField("means")}
-                  className="text-blue"
-                  ariaLabel="Problem framing: means"
-                />
-              </div>
-              <div>
-                have to{" "}
-                <EditableText
-                  value={content.haveTo}
-                  onChange={setField("haveTo")}
-                  className="text-blue"
-                  ariaLabel="Problem framing: have to"
-                />
-              </div>
-              <div>
-                the cost is{" "}
-                <EditableText
-                  value={content.cost}
-                  onChange={setField("cost")}
-                  className="text-blue"
-                  ariaLabel="Problem framing: cost"
-                />
-                .
-              </div>
+              {content.framing.map((line) => (
+                <div key={line.id}>
+                  <EditableText
+                    readOnly={ro}
+                    value={line.lead}
+                    onChange={(v) => setListItem("framing", line.id, { lead: v })}
+                    ariaLabel={`Framing lead: ${line.lead}`}
+                  />{" "}
+                  <EditableText
+                    readOnly={ro}
+                    value={line.value}
+                    onChange={(v) => setListItem("framing", line.id, { value: v })}
+                    ariaLabel={`Framing value: ${line.lead}`}
+                    className="text-blue"
+                  />
+                  {line.id === "cost" ? "." : ""}
+                </div>
+              ))}
             </div>
           </section>
 
           <section className="flex flex-col gap-[18px]">
             <div className="flex items-baseline justify-between border-b-2 border-border-soft pb-2.5">
-              <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">
-                Where it shows up today
-              </span>
-              <span className="text-[11px] italic text-faint">From Meridian's 2025 production report</span>
+              <EditableText
+                readOnly={ro}
+                value={content.statsLabel}
+                onChange={(v) => setField("statsLabel", v)}
+                ariaLabel="Stats section label"
+                className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
+              />
+              <EditableText
+                readOnly={ro}
+                value={content.statsSource}
+                onChange={(v) => setField("statsSource", v)}
+                ariaLabel="Stats source note"
+                className="text-[11px] italic text-faint"
+              />
             </div>
             <div className="grid grid-cols-4 gap-[26px]">
-              <Stat
-                value={<EditableText value={content.statDays} onChange={setField("statDays")} ariaLabel="Median submission to first quote" />}
-                unit="days"
-                label="Median submission to first quote"
-              />
-              <Stat
-                value={<EditableText value={content.statPortals} onChange={setField("statPortals")} ariaLabel="Rekeyed per cyber account" />}
-                unit="portals"
-                label="Rekeyed per cyber account"
-              />
-              <Stat
-                value={<EditableText value={content.statPercent} onChange={setField("statPercent")} ariaLabel="Submissions never quoted out" />}
-                unit="%"
-                label="Submissions never quoted out"
-                accent="text-red"
-              />
-              <Stat
-                value={<EditableText value={content.statPremium} onChange={setField("statPremium")} ariaLabel="Annual premium left unwritten" />}
-                label="Annual premium left unwritten"
-                accent="text-red"
-              />
+              {content.stats.map((stat) => (
+                <div key={stat.id} className="flex flex-col gap-1.5">
+                  <div
+                    className={`text-[30px] font-bold tracking-[-0.02em] ${
+                      stat.accent === "red" ? "text-red" : "text-navy"
+                    }`}
+                  >
+                    <EditableText
+                      readOnly={ro}
+                      value={stat.value}
+                      onChange={(v) => setListItem("stats", stat.id, { value: v })}
+                      ariaLabel={`${stat.label} value`}
+                    />
+                    {stat.unit && (
+                      <span className="text-[15px] font-normal text-muted">
+                        {" "}
+                        <EditableText
+                          readOnly={ro}
+                          value={stat.unit}
+                          onChange={(v) => setListItem("stats", stat.id, { unit: v })}
+                          ariaLabel={`${stat.label} unit`}
+                        />
+                      </span>
+                    )}
+                  </div>
+                  <EditableText
+                    readOnly={ro}
+                    value={stat.label}
+                    onChange={(v) => setListItem("stats", stat.id, { label: v })}
+                    ariaLabel={`Stat label: ${stat.label}`}
+                    className="text-[11.5px] leading-[1.45] text-muted"
+                  />
+                </div>
+              ))}
             </div>
           </section>
 
           <section className="grid grid-cols-[1.15fr_1fr] items-start gap-[34px]">
             <div className="flex flex-col gap-4">
               <div className="border-b-2 border-border-soft pb-2.5">
-                <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">
-                  What changes
-                </span>
+                <EditableText
+                  readOnly={ro}
+                  value={content.changesLabel}
+                  onChange={(v) => setField("changesLabel", v)}
+                  ariaLabel="What changes label"
+                  className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
+                />
               </div>
-              <p className="m-0 text-sm leading-[1.65] text-body">
-                Producers submit once in 1Fort. We push to Coalition, At-Bay, Chubb, Corvus, Beazley and Travelers in
-                parallel, return bindable quotes in minutes, and generate the comparison and proposal for you.
-              </p>
+              <EditableText
+                as="p"
+                readOnly={ro}
+                multiline
+                fullWidth
+                value={content.changesBody}
+                onChange={(v) => setField("changesBody", v)}
+                ariaLabel="What changes body"
+                className="m-0 text-sm leading-[1.65] text-body"
+              />
               <ul className="m-0 flex list-none flex-col gap-[11px] p-0">
-                {[
-                  "One application, six markets, no rekeying",
-                  "AI coverage comparison the insured can actually read",
-                  "Bind, invoice and collect in the same thread",
-                ].map((point) => (
-                  <li key={point} className="flex gap-2.5 text-[13px] leading-[1.5] text-body">
+                {content.changesBullets.map((bullet) => (
+                  <li key={bullet.id} className="flex gap-2.5 text-[13px] leading-[1.5] text-body">
                     <CheckIcon className="mt-0.5 flex-none text-live" />
-                    {point}
+                    <EditableText
+                      readOnly={ro}
+                      value={bullet.text}
+                      onChange={(v) => setListItem("changesBullets", bullet.id, { text: v })}
+                      ariaLabel={`Bullet: ${bullet.text}`}
+                    />
                   </li>
                 ))}
               </ul>
             </div>
 
             <div className="flex flex-col gap-[18px] rounded-lg bg-row-hover px-6 pt-6 pb-[22px]">
-              <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">Year one</span>
+              <EditableText
+                readOnly={ro}
+                value={content.yearOneLabel}
+                onChange={(v) => setField("yearOneLabel", v)}
+                ariaLabel="Year one label"
+                className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
+              />
               <div className="flex flex-col gap-[3px]">
                 <div className="text-[38px] leading-none font-bold tracking-[-0.03em] text-navy">
-                  <EditableText value={content.yearOneTotal} onChange={setField("yearOneTotal")} ariaLabel="Year one incremental written premium" />
+                  <EditableText
+                    readOnly={ro}
+                    value={content.yearOneValue}
+                    onChange={(v) => setField("yearOneValue", v)}
+                    ariaLabel="Year one headline figure"
+                  />
                 </div>
-                <div className="text-xs text-muted">Incremental written premium</div>
+                <EditableText
+                  readOnly={ro}
+                  value={content.yearOneCaption}
+                  onChange={(v) => setField("yearOneCaption", v)}
+                  ariaLabel="Year one caption"
+                  className="text-xs text-muted"
+                />
               </div>
               <div className="h-px bg-border" />
               <div className="flex flex-col gap-3">
-                <Row
-                  label="Producer hours returned"
-                  value={<EditableText value={content.hoursReturned} onChange={setField("hoursReturned")} ariaLabel="Producer hours returned" />}
-                />
-                <Row
-                  label="Platform investment"
-                  value={<EditableText value={content.platformInvestment} onChange={setField("platformInvestment")} ariaLabel="Platform investment" />}
-                />
-                <Row
-                  label="Payback"
-                  value={<EditableText value={content.payback} onChange={setField("payback")} ariaLabel="Payback period" />}
-                  valueClass="text-green"
-                />
+                {content.yearOneRows.map((row) => (
+                  <div key={row.id} className="flex items-baseline justify-between gap-3">
+                    <EditableText
+                      readOnly={ro}
+                      value={row.label}
+                      onChange={(v) => setListItem("yearOneRows", row.id, { label: v })}
+                      ariaLabel={`Row label: ${row.label}`}
+                      className="text-xs text-muted"
+                    />
+                    <EditableText
+                      readOnly={ro}
+                      value={row.value}
+                      onChange={(v) => setListItem("yearOneRows", row.id, { value: v })}
+                      ariaLabel={`Row value: ${row.label}`}
+                      className={`text-[13px] font-bold ${
+                        row.accent === "green" ? "text-green" : "text-gray-900"
+                      }`}
+                    />
+                  </div>
+                ))}
               </div>
-              <p className="m-0 text-[10px] leading-[1.5] italic text-faint">
-                Modeled on your 2025 cyber and E&amp;O volume at a 12% hit-rate lift. Full model in Documents.
-              </p>
+              <EditableText
+                as="p"
+                readOnly={ro}
+                multiline
+                fullWidth
+                value={content.yearOneFootnote}
+                onChange={(v) => setField("yearOneFootnote", v)}
+                ariaLabel="Year one footnote"
+                className="m-0 text-[10px] leading-[1.5] italic text-faint"
+              />
             </div>
           </section>
 
           <section className="flex flex-col gap-4">
             <div className="border-b-2 border-border-soft pb-2.5">
-              <span className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase">Next 30 days</span>
+              <EditableText
+                readOnly={ro}
+                value={content.nextLabel}
+                onChange={(v) => setField("nextLabel", v)}
+                ariaLabel="Next 30 days label"
+                className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
+              />
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
-              <Week num="WEEK 1" title="Pilot with two producers" sub="Cyber and Tech E&O only, live accounts" />
-              <Week num="WEEK 3" title="Measure quote turnaround" sub="Against your 11.5-day baseline" />
-              <Week num="WEEK 4" title="Roll to the full desk" sub="Agency-wide, AMS sync included" />
+              {content.weeks.map((week) => (
+                <div
+                  key={week.id}
+                  className="flex flex-col gap-1.5 rounded-md border border-border bg-white px-5 py-[18px]"
+                >
+                  <EditableText
+                    readOnly={ro}
+                    value={week.num}
+                    onChange={(v) => setListItem("weeks", week.id, { num: v })}
+                    ariaLabel={`${week.num} label`}
+                    className="font-mono text-[10px] text-blue"
+                  />
+                  <EditableText
+                    readOnly={ro}
+                    value={week.title}
+                    onChange={(v) => setListItem("weeks", week.id, { title: v })}
+                    ariaLabel={`${week.num} title`}
+                    className="text-[13px] font-bold text-gray-900"
+                  />
+                  <EditableText
+                    readOnly={ro}
+                    value={week.sub}
+                    onChange={(v) => setListItem("weeks", week.id, { sub: v })}
+                    ariaLabel={`${week.num} detail`}
+                    className="text-[11.5px] leading-[1.45] text-muted"
+                  />
+                </div>
+              ))}
             </div>
           </section>
 
           <footer className="flex items-center justify-between gap-5 border-t border-border-soft pt-5">
-            <span className="text-[10px] text-faint">
-              Prepared for Meridian Risk Partners by Rachel Moss · 1Fort · SOC 2 Type II
-            </span>
-            <span className="font-mono text-[10px] text-faint">MRP-BC-0427</span>
+            <EditableText
+              readOnly={ro}
+              value={content.footerNote}
+              onChange={(v) => setField("footerNote", v)}
+              ariaLabel="Footer note"
+              className="text-[10px] text-faint"
+            />
+            <EditableText
+              readOnly={ro}
+              value={content.footerRef}
+              onChange={(v) => setField("footerRef", v)}
+              ariaLabel="Document reference"
+              className="font-mono text-[10px] text-faint"
+            />
           </footer>
         </article>
       </div>
@@ -269,30 +339,65 @@ export function CaseView({ audience }: CaseViewProps) {
               <SparkleIcon className="text-blue" />
               <span className="text-[12.5px] font-bold text-gray-900">Generated from</span>
             </div>
+
             <div className="flex flex-col gap-2.5">
-              {sources.map((s) => (
-                <div key={s.label} className="flex items-center justify-between gap-2.5">
-                  <span className={`text-xs ${s.used ? "text-body" : "text-faint"}`}>{s.label}</span>
-                  <span className={`font-mono text-[10px] ${s.used ? "text-live" : "text-faintest"}`}>
-                    {s.used ? "USED" : "SKIPPED"}
-                  </span>
+              {sources.map((source) => (
+                <div key={source.id} className="flex items-center justify-between gap-2.5">
+                  <EditableText
+                    value={source.label}
+                    onChange={(v) => renameSource(source.id, v)}
+                    ariaLabel={`Source name: ${source.label}`}
+                    className={`text-xs ${source.used ? "text-body" : "text-faint"}`}
+                  />
+                  <button
+                    onClick={() => toggleSource(source.id)}
+                    aria-pressed={source.used}
+                    title={source.used ? "Exclude from the next draft" : "Include in the next draft"}
+                    className={`flex-none cursor-pointer rounded border-none bg-transparent px-1 font-mono text-[10px] transition-colors hover:underline ${
+                      source.used ? "text-live" : "text-faintest"
+                    }`}
+                  >
+                    {source.used ? "USED" : "SKIPPED"}
+                  </button>
                 </div>
               ))}
             </div>
+
+            {error && (
+              <div className="flex items-start justify-between gap-2 rounded-md bg-red/10 px-2.5 py-2">
+                <span className="text-[11px] leading-[1.45] text-red">{error}</span>
+                <button
+                  onClick={dismissError}
+                  aria-label="Dismiss error"
+                  className="flex-none cursor-pointer border-none bg-transparent font-mono text-[11px] text-red"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             <button
               onClick={regenerate}
-              className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-3 py-[9px] font-sans text-xs font-bold text-blue transition-all hover:border-blue-border hover:bg-blue-bg"
+              disabled={status === "working"}
+              className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-3 py-[9px] font-sans text-xs font-bold text-blue transition-all hover:border-blue-border hover:bg-blue-bg disabled:cursor-not-allowed disabled:text-faint"
             >
-              <RefreshIcon />
-              {regenerating ? "Regenerating…" : "Regenerate 1-pager"}
+              <RefreshIcon className={status === "working" ? "animate-spin" : undefined} />
+              {status === "working" ? "Regenerating…" : "Regenerate 1-pager"}
             </button>
+
+            {!isLive && (
+              <p className="m-0 text-[10px] leading-[1.45] text-faint">
+                AI generation is disconnected — regenerate rebuilds the draft from the selected
+                sources locally.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-3.5 rounded-[10px] border border-border bg-white p-5">
             <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">Buyer engagement</span>
             <div className="flex flex-col gap-3">
-              {engagement.map((e) => (
-                <div key={e.label} className="flex flex-col gap-1.5">
+              {ENGAGEMENT.map((e) => (
+                <div key={e.id} className="flex flex-col gap-1.5">
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs text-body">{e.label}</span>
                     <span className="font-mono text-[11px] text-gray-900">{e.time}</span>
@@ -321,47 +426,6 @@ export function CaseView({ audience }: CaseViewProps) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({
-  value,
-  unit,
-  label,
-  accent = "text-navy",
-}: {
-  value: ReactNode;
-  unit?: string;
-  label: string;
-  accent?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className={`text-[30px] font-bold tracking-[-0.02em] ${accent}`}>
-        {value}
-        {unit && <span className="text-[15px] font-normal text-muted"> {unit}</span>}
-      </div>
-      <div className="text-[11.5px] leading-[1.45] text-muted">{label}</div>
-    </div>
-  );
-}
-
-function Row({ label, value, valueClass = "text-gray-900" }: { label: string; value: ReactNode; valueClass?: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-xs text-muted">{label}</span>
-      <span className={`text-[13px] font-bold ${valueClass}`}>{value}</span>
-    </div>
-  );
-}
-
-function Week({ num, title, sub }: { num: string; title: string; sub: string }) {
-  return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-border bg-white px-5 py-[18px]">
-      <span className="font-mono text-[10px] text-blue">{num}</span>
-      <span className="text-[13px] font-bold text-gray-900">{title}</span>
-      <span className="text-[11.5px] leading-[1.45] text-muted">{sub}</span>
     </div>
   );
 }
