@@ -1,0 +1,77 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@font-face {
+  font-family: "HN Fort";
+  src: url("./assets/fonts/HNFort-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "HN Fort";
+  src: url("./assets/fonts/HNFort-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "HN Fort";
+  src: url("./assets/fonts/HNFort-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "HN Fort", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-navy: #00012e;
+  --color-blue: #2280ee;
+  --color-blue-hover: #1b6ac7;
+  --color-blue-bg: #f5f9ff;
+  --color-blue-bg-soft: #e8eff9;
+  --color-blue-border: #a9c8f3;
+  --color-green: #0e9b79;
+  --color-green-bg: #eafbf6;
+  --color-live: #10cf9e;
+  --color-red: #ff5757;
+  --color-ink: #111827;
+  --color-body: #374151;
+  --color-muted: #6b7280;
+  --color-faint: #9aa1ad;
+  --color-faintest: #c9d2dc;
+  --color-border: #e4e8eb;
+  --color-border-soft: #edeff2;
+  --color-border-dashed: #d8dde4;
+  --color-panel: #fbfbfc;
+  --color-row-hover: #f9fafb;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--color-blue);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-blue-hover);
+}
+
+::selection {
+  background: #d8e7fc;
+}
