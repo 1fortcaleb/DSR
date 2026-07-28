@@ -1,9 +1,11 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ElementType,
   type KeyboardEvent,
+  type Ref,
 } from "react";
 
 interface EditableTextProps {
@@ -11,9 +13,14 @@ interface EditableTextProps {
   onChange: (next: string) => void;
   className?: string;
   as?: ElementType;
-  /** Input takes the full width of its container instead of sizing to content. */
-  fullWidth?: boolean;
-  /** Renders a textarea; Enter inserts a newline, Cmd/Ctrl+Enter commits. */
+  /**
+   * Size the field to its content instead of its container. Use only for values
+   * that sit inside a sentence or a horizontal row, where a full-width field
+   * would break the layout. Content that wraps must NOT use this — an input
+   * cannot wrap, so the surrounding box would change height on edit.
+   */
+  inline?: boolean;
+  /** Allow newlines: Enter inserts one, Cmd/Ctrl+Enter commits. */
   multiline?: boolean;
   /** Renders inert plain text — used for the buyer view, which can't edit. */
   readOnly?: boolean;
@@ -21,39 +28,80 @@ interface EditableTextProps {
 }
 
 /**
- * Click-to-edit text. Renders as plain `as` markup (inheriting surrounding
- * styles) until clicked, then swaps to an input/textarea with the same
- * className so the edit state stays visually consistent with the display state.
+ * Click-to-edit text.
+ *
+ * The editing field is deliberately isomorphic with the display element: it
+ * inherits the same className (font, size, leading, colour), the same width,
+ * and is pinned to the measured height of the text it replaces — so opening a
+ * field never reflows the surrounding layout. Form controls don't derive their
+ * height from `line-height` the way text does, so measuring is more reliable
+ * than trying to match metrics per field.
  */
 export function EditableText({
   value,
   onChange,
   className = "",
   as = "span",
-  fullWidth = false,
+  inline = false,
   multiline = false,
   readOnly = false,
   ariaLabel,
 }: EditableTextProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
-  const fieldRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  /**
+   * Geometry of the display element, captured at the moment editing starts.
+   * Form controls don't inherit `line-height` (the UA sheet forces `normal`),
+   * so it is copied across explicitly rather than via a class — a class would
+   * also have to win a specificity race against the caller's own leading.
+   */
+  const [box, setBox] = useState<{ height: number; lineHeight: string } | null>(null);
+  const boxHeight = box?.height ?? null;
+  const displayRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!editing) setDraft(value);
   }, [value, editing]);
 
   useEffect(() => {
-    if (editing) {
-      fieldRef.current?.focus();
-      fieldRef.current?.select();
+    if (!editing) return;
+    const field = inline ? inputRef.current : areaRef.current;
+    field?.focus();
+    field?.select();
+  }, [editing, inline]);
+
+  // Hold the textarea at the exact (possibly fractional) height of the text it
+  // replaced, and grow only once the content genuinely overflows that box.
+  // Using scrollHeight unconditionally would round a fractional height up and
+  // nudge the layout by a pixel or two on open.
+  useLayoutEffect(() => {
+    const el = areaRef.current;
+    if (!editing || inline || !el) return;
+    el.style.height = boxHeight != null ? `${boxHeight}px` : "auto";
+    if (el.scrollHeight > el.clientHeight + 1) {
+      el.style.height = `${el.scrollHeight}px`;
     }
-  }, [editing]);
+  }, [editing, inline, draft, boxHeight]);
 
   const Tag = as;
 
   if (readOnly) {
     return <Tag className={className}>{value}</Tag>;
+  }
+
+  function startEditing() {
+    const el = displayRef.current;
+    setBox(
+      el
+        ? {
+            height: el.getBoundingClientRect().height,
+            lineHeight: getComputedStyle(el).lineHeight,
+          }
+        : null,
+    );
+    setEditing(true);
   }
 
   function commit() {
@@ -74,51 +122,58 @@ export function EditableText({
       return;
     }
     if (e.key !== "Enter") return;
-    // In multiline, plain Enter should insert a newline; only the modifier commits.
-    if (multiline && !(e.metaKey || e.ctrlKey)) return;
+    if (multiline && !(e.metaKey || e.ctrlKey)) return; // let the newline through
     e.preventDefault();
     commit();
   }
 
-  const editingClass = `${className} block rounded-sm border-none bg-blue-bg px-1 -mx-1 outline-none ring-2 ring-blue ring-inset`;
+  const fieldClass = `${className} box-border rounded-sm border-none bg-blue-bg px-1 -mx-1 py-0 outline-none ring-2 ring-blue ring-inset`;
 
   if (editing) {
-    if (multiline) {
+    if (inline) {
       return (
-        <textarea
-          ref={fieldRef}
+        <input
+          ref={inputRef}
           value={draft}
-          rows={Math.max(3, Math.ceil(draft.length / 72))}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={handleKeyDown}
           aria-label={ariaLabel}
-          className={`${editingClass} w-full resize-y`}
+          className={`${fieldClass} max-w-full align-baseline`}
+          style={{
+            width: `${Math.max(draft.length, 1) + 1.5}ch`,
+            height: boxHeight ?? undefined,
+            lineHeight: box?.lineHeight,
+          }}
         />
       );
     }
+    // Width compensates for the -mx-1 bleed so the textarea's text column is
+    // exactly as wide as the display element's, and wraps at the same points.
     return (
-      <input
-        ref={fieldRef}
+      <textarea
+        ref={areaRef}
         value={draft}
+        rows={1}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         aria-label={ariaLabel}
-        className={editingClass}
-        style={fullWidth ? { width: "100%" } : { width: `${Math.max(draft.length, 1) + 1.5}ch` }}
+        style={{ lineHeight: box?.lineHeight }}
+        className={`${fieldClass} block w-[calc(100%+0.5rem)] resize-none overflow-hidden`}
       />
     );
   }
 
   return (
     <Tag
+      ref={displayRef as Ref<HTMLElement>}
       tabIndex={0}
-      onClick={() => setEditing(true)}
+      onClick={startEditing}
       onKeyDown={(e: KeyboardEvent) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          setEditing(true);
+          startEditing();
         }
       }}
       aria-label={ariaLabel ?? "Click to edit"}

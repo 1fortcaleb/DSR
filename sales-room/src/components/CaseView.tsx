@@ -38,6 +38,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 readOnly={ro}
                 value={content.kicker}
                 onChange={(v) => setField("kicker", v)}
+                inline
                 ariaLabel="Document kicker"
                 className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase"
               />
@@ -45,6 +46,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 readOnly={ro}
                 value={content.pageCount}
                 onChange={(v) => setField("pageCount", v)}
+                inline
                 ariaLabel="Page count"
                 className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase"
               />
@@ -52,7 +54,6 @@ export function CaseView({ audience, room }: CaseViewProps) {
             <EditableText
               as="h1"
               readOnly={ro}
-              fullWidth
               value={content.headline}
               onChange={(v) => setField("headline", v)}
               ariaLabel="Headline"
@@ -66,6 +67,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
               readOnly={ro}
               value={content.framingLabel}
               onChange={(v) => setField("framingLabel", v)}
+              inline
               ariaLabel="Problem framing label"
               className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase"
             />
@@ -76,12 +78,14 @@ export function CaseView({ audience, room }: CaseViewProps) {
                     readOnly={ro}
                     value={line.lead}
                     onChange={(v) => setListItem("framing", line.id, { lead: v })}
+                    inline
                     ariaLabel={`Framing lead: ${line.lead}`}
                   />{" "}
                   <EditableText
                     readOnly={ro}
                     value={line.value}
                     onChange={(v) => setListItem("framing", line.id, { value: v })}
+                    inline
                     ariaLabel={`Framing value: ${line.lead}`}
                     className="text-blue"
                   />
@@ -97,6 +101,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 readOnly={ro}
                 value={content.statsLabel}
                 onChange={(v) => setField("statsLabel", v)}
+                inline
                 ariaLabel="Stats section label"
                 className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
               />
@@ -104,6 +109,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 readOnly={ro}
                 value={content.statsSource}
                 onChange={(v) => setField("statsSource", v)}
+                inline
                 ariaLabel="Stats source note"
                 className="text-[11px] italic text-faint"
               />
@@ -120,6 +126,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                       readOnly={ro}
                       value={stat.value}
                       onChange={(v) => setListItem("stats", stat.id, { value: v })}
+                      inline
                       ariaLabel={`${stat.label} value`}
                     />
                     {stat.unit && (
@@ -129,6 +136,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                           readOnly={ro}
                           value={stat.unit}
                           onChange={(v) => setListItem("stats", stat.id, { unit: v })}
+                          inline
                           ariaLabel={`${stat.label} unit`}
                         />
                       </span>
@@ -153,6 +161,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                   readOnly={ro}
                   value={content.changesLabel}
                   onChange={(v) => setField("changesLabel", v)}
+                  inline
                   ariaLabel="What changes label"
                   className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
                 />
@@ -161,7 +170,6 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 as="p"
                 readOnly={ro}
                 multiline
-                fullWidth
                 value={content.changesBody}
                 onChange={(v) => setField("changesBody", v)}
                 ariaLabel="What changes body"
@@ -169,7 +177,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
               />
               <ul className="m-0 flex list-none flex-col gap-[11px] p-0">
                 {content.changesBullets.map((bullet) => (
-                  <li key={bullet.id} className="flex gap-2.5 text-[13px] leading-[1.5] text-body">
+                  <li key={bullet.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-2.5 text-[13px] leading-[1.5] text-body">
                     <CheckIcon className="mt-0.5 flex-none text-live" />
                     <EditableText
                       readOnly={ro}
@@ -187,6 +195,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 readOnly={ro}
                 value={content.yearOneLabel}
                 onChange={(v) => setField("yearOneLabel", v)}
+                inline
                 ariaLabel="Year one label"
                 className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
               />
@@ -196,6 +205,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                     readOnly={ro}
                     value={content.yearOneValue}
                     onChange={(v) => setField("yearOneValue", v)}
+                    inline
                     ariaLabel="Year one headline figure"
                   />
                 </div>
@@ -215,6 +225,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                       readOnly={ro}
                       value={row.label}
                       onChange={(v) => setListItem("yearOneRows", row.id, { label: v })}
+                      inline
                       ariaLabel={`Row label: ${row.label}`}
                       className="text-xs text-muted"
                     />
@@ -222,6 +233,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                       readOnly={ro}
                       value={row.value}
                       onChange={(v) => setListItem("yearOneRows", row.id, { value: v })}
+                      inline
                       ariaLabel={`Row value: ${row.label}`}
                       className={`text-[13px] font-bold ${
                         row.accent === "green" ? "text-green" : "text-gray-900"
@@ -234,7 +246,6 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 as="p"
                 readOnly={ro}
                 multiline
-                fullWidth
                 value={content.yearOneFootnote}
                 onChange={(v) => setField("yearOneFootnote", v)}
                 ariaLabel="Year one footnote"
@@ -249,6 +260,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                 readOnly={ro}
                 value={content.nextLabel}
                 onChange={(v) => setField("nextLabel", v)}
+                inline
                 ariaLabel="Next 30 days label"
                 className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
               />
@@ -263,6 +275,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                     readOnly={ro}
                     value={week.num}
                     onChange={(v) => setListItem("weeks", week.id, { num: v })}
+                    inline
                     ariaLabel={`${week.num} label`}
                     className="font-mono text-[10px] text-blue"
                   />
@@ -290,6 +303,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
               readOnly={ro}
               value={content.footerNote}
               onChange={(v) => setField("footerNote", v)}
+              inline
               ariaLabel="Footer note"
               className="text-[10px] text-faint"
             />
@@ -297,6 +311,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
               readOnly={ro}
               value={content.footerRef}
               onChange={(v) => setField("footerRef", v)}
+              inline
               ariaLabel="Document reference"
               className="font-mono text-[10px] text-faint"
             />
@@ -346,6 +361,7 @@ export function CaseView({ audience, room }: CaseViewProps) {
                   <EditableText
                     value={source.label}
                     onChange={(v) => renameSource(source.id, v)}
+                    inline
                     ariaLabel={`Source name: ${source.label}`}
                     className={`text-xs ${source.used ? "text-body" : "text-faint"}`}
                   />
