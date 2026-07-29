@@ -16,6 +16,12 @@ function Room() {
   // The CMS is rep-only; flipping to the counterparty view leaves it.
   const effectiveView: RoomView = audience === "buyer" && view === "manage" ? "case" : view;
 
+  // Manage takes over the window. It carries its own rooms rail and exit
+  // control, so keeping the room sidebar would name the same room twice.
+  if (effectiveView === "manage") {
+    return <ManageView onExit={() => setView("case")} />;
+  }
+
   return (
     <div className="grid min-h-screen min-w-[1440px] grid-cols-[268px_1fr] bg-white">
       <Sidebar
@@ -29,7 +35,6 @@ function Room() {
         {effectiveView === "case" && <CaseView audience={audience} />}
         {effectiveView === "files" && <FilesView audience={audience} />}
         {effectiveView === "videos" && <VideosView audience={audience} />}
-        {effectiveView === "manage" && <ManageView />}
       </main>
     </div>
   );

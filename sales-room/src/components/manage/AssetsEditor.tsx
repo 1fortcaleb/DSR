@@ -34,7 +34,7 @@ export function AssetThumb({ asset, className = "" }: { asset: Asset; className?
 export function AssetsEditor() {
   const { assets, upload, remove, rename, uploading, loading, error, dismissError, generate, generationLive, openUrl } =
     useAssets();
-  const { activeRoom } = useRooms();
+  const { rooms, activeRoom } = useRooms();
   const [filter, setFilter] = useState<AssetKind | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -45,10 +45,19 @@ export function AssetsEditor() {
   const shown = filter === "all" ? assets : assets.filter((a) => a.kind === filter);
   const selected = assets.find((a) => a.id === selectedId) ?? null;
 
-  /** Rooms referencing an asset, so deleting something in use is visible. */
-  const usageOf = (id: string) =>
-    activeRoom.documents.filter((d) => d.assetId === id).length +
-    [...activeRoom.videos, ...activeRoom.library].filter((v) => v.posterAssetId === id).length;
+  /**
+   * Names of every room referencing an asset. Scans all rooms, not just the
+   * active one — the library is shared, so an asset attached elsewhere must
+   * still read as in use before someone deletes it.
+   */
+  const usedBy = (id: string) =>
+    rooms
+      .filter(
+        (room) =>
+          room.documents.some((d) => d.assetId === id) ||
+          [...room.videos, ...room.library].some((v) => v.posterAssetId === id),
+      )
+      .map((room) => room.name);
 
   async function openInTab(id: string) {
     const url = await openUrl(id);
@@ -73,15 +82,14 @@ export function AssetsEditor() {
             if (e.dataTransfer.files.length) void upload(e.dataTransfer.files);
           }}
           onClick={() => inputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-7 text-center transition-colors ${
+          className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-3 text-center transition-colors ${
             dragOver ? "border-blue bg-blue-bg" : "border-border-dashed bg-row-hover hover:border-blue"
           }`}
         >
-          <span className="text-[13px] font-bold text-navy">
-            {uploading > 0 ? `Adding ${uploading} file${uploading > 1 ? "s" : ""}…` : "Drop files here"}
-          </span>
-          <span className="text-[11.5px] text-muted">
-            Images and video get a real thumbnail; documents get a typed tile.
+          <span className="text-[12.5px] font-bold text-navy">
+            {uploading > 0
+              ? `Adding ${uploading} file${uploading > 1 ? "s" : ""}…`
+              : "Drop files here, or click to browse"}
           </span>
           <input
             ref={inputRef}
@@ -132,13 +140,20 @@ export function AssetsEditor() {
         {loading ? (
           <p className="m-0 text-[12.5px] text-muted">Opening library…</p>
         ) : shown.length === 0 ? (
-          <p className="m-0 text-[12.5px] text-muted">
-            {assets.length === 0 ? "No assets yet." : "Nothing of that type."}
-          </p>
+          <div className="flex flex-col items-center gap-1 rounded-lg bg-row-hover px-4 py-9 text-center">
+            <span className="text-[12.5px] font-bold text-muted">
+              {assets.length === 0 ? "Nothing in the library yet" : "Nothing of that type"}
+            </span>
+            <span className="max-w-[380px] text-[11.5px] leading-[1.5] text-faint">
+              {assets.length === 0
+                ? "Add a file above. Images and video get a thumbnail generated from the file itself; documents get a tile coloured by type."
+                : "Try another filter, or add a file above."}
+            </span>
+          </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-3">
             {shown.map((asset) => {
-              const uses = usageOf(asset.id);
+              const uses = usedBy(asset.id);
               return (
                 <button
                   key={asset.id}
@@ -156,9 +171,12 @@ export function AssetsEditor() {
                         AI
                       </span>
                     )}
-                    {uses > 0 && (
-                      <span className="absolute top-1.5 right-1.5 rounded bg-green-bg px-1.5 py-0.5 font-mono text-[9px] text-green">
-                        IN USE
+                    {uses.length > 0 && (
+                      <span
+                        title={`Used in ${uses.join(", ")}`}
+                        className="absolute top-1.5 right-1.5 rounded bg-green-bg px-1.5 py-0.5 font-mono text-[9px] text-green"
+                      >
+                        {uses.length > 1 ? `IN ${uses.length} ROOMS` : "IN USE"}
                       </span>
                     )}
                   </div>
@@ -193,66 +211,86 @@ export function AssetsEditor() {
                   Prompt: {selected.prompt}
                 </p>
               )}
-              <div className="flex gap-2">
-                <Button onClick={() => void openInTab(selected.id)}>Open</Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    void remove(selected.id);
-                    setSelectedId(null);
-                  }}
-                  title={
-                    usageOf(selected.id) > 0
-                      ? "This asset is attached to something in this room"
-                      : undefined
-                  }
-                >
-                  Delete{usageOf(selected.id) > 0 ? " (in use)" : ""}
-                </Button>
-              </div>
+              {(() => {
+                const uses = usedBy(selected.id);
+                return (
+                  <>
+                    <p className="m-0 text-[11.5px] leading-[1.5] text-muted">
+                      {uses.length === 0
+                        ? "Not attached to any room."
+                        : `Attached in ${uses.join(", ")}.`}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button onClick={() => void openInTab(selected.id)}>Open</Button>
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          void remove(selected.id);
+                          setSelectedId(null);
+                        }}
+                        title={
+                          uses.length > 0
+                            ? `Still attached in ${uses.join(", ")} — those will fall back to a placeholder`
+                            : undefined
+                        }
+                      >
+                        Delete{uses.length > 0 ? " (in use)" : ""}
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </Section>
       )}
 
-      <Section
-        title="Generate an asset"
-        hint="Describe what you need and the model builds it into the library."
-      >
-        <TextField
-          label="Prompt"
-          value={prompt}
-          onChange={setPrompt}
-          multiline
-          rows={3}
-          placeholder="A cover image for the Meridian business case, navy and white, no text"
-        />
-        <div className="grid grid-cols-[200px_auto] items-end gap-2">
-          <SelectField<AssetKind>
-            label="Type"
-            value={genKind}
-            options={[
-              { value: "image", label: "Image" },
-              { value: "document", label: "Document" },
-              { value: "video", label: "Video" },
-            ]}
-            onChange={setGenKind}
-          />
-          <Button
-            variant="primary"
-            disabled={!generationLive || !prompt.trim()}
-            onClick={() => void generate(prompt, genKind, activeRoom.account.company)}
-            title={generationLive ? undefined : "Connect the Claude API to generate assets"}
-          >
-            Generate
-          </Button>
-        </div>
+      <Section title="Generate an asset" hint="Describe what you need and the model builds it into the library.">
         {!generationLive && (
-          <p className="m-0 text-[10.5px] leading-[1.45] text-faint">
-            Disconnected. Generation stays off until there's a backend route holding the API key —
-            it can't be called from the browser without shipping the key to every viewer.
-          </p>
+          <div className="flex items-start gap-2 rounded-md border border-border-soft bg-row-hover px-3 py-2">
+            <span className="mt-px flex-none font-mono text-[9px] tracking-[0.08em] text-faint uppercase">
+              Off
+            </span>
+            <p className="m-0 text-[11.5px] leading-[1.5] text-muted">
+              Generation stays off until there's a backend route holding the API key — calling Claude
+              straight from the browser would ship the key to everyone who opens a room.
+            </p>
+          </div>
         )}
+        <fieldset
+          disabled={!generationLive}
+          className="m-0 flex min-w-0 flex-col gap-3 border-none p-0 disabled:opacity-55"
+        >
+          <TextField
+            label="Prompt"
+            value={prompt}
+            onChange={setPrompt}
+            multiline
+            rows={3}
+            placeholder={`A cover image for the ${activeRoom.account.company} business case, navy and white, no text`}
+          />
+          <div className="flex items-end gap-2">
+            <div className="w-[200px] flex-none">
+              <SelectField<AssetKind>
+                label="Type"
+                value={genKind}
+                options={[
+                  { value: "image", label: "Image" },
+                  { value: "document", label: "Document" },
+                  { value: "video", label: "Video" },
+                ]}
+                onChange={setGenKind}
+              />
+            </div>
+            <Button
+              variant="primary"
+              disabled={!generationLive || !prompt.trim()}
+              onClick={() => void generate(prompt, genKind, activeRoom.account.company)}
+            >
+              Generate
+            </Button>
+          </div>
+        </fieldset>
       </Section>
     </div>
   );
