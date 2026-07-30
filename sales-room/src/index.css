@@ -48,6 +48,23 @@
   --color-border-dashed: #d8dde4;
   --color-panel: #fbfbfc;
   --color-row-hover: #f9fafb;
+
+  /* Dark navigation chrome. Drawn from the 1Fort essay treatment: near-black
+     ground, white for the thing you're on, mid-grey to step things back, and a
+     periwinkle accent for the live/active marker. Only the left rails use
+     these — the room itself stays a light document. */
+  --color-nav: #0e1216;
+  --color-nav-raised: #171c22;
+  --color-nav-active: #262e38;
+  --color-nav-line: #262d36;
+  /* Four tiers with real separation. The faint tier carries 10px mono labels,
+     so it is set to clear 4.5:1 on both --color-nav and --color-nav-raised
+     rather than to look as recessive as the light theme's equivalent. */
+  --color-nav-hi: #ffffff;
+  --color-nav-body: #c6ccd4;
+  --color-nav-muted: #a2aab5;
+  --color-nav-faint: #808896;
+  --color-periwinkle: #8e96e8;
 }
 
 html,
