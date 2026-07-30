@@ -117,6 +117,30 @@ export interface CaseContent {
   footerRef: string;
 }
 
+/* ------------------------------------------------------------- responses */
+
+/**
+ * The counterparty's reaction to one claim on the 1-pager. A business case
+ * exists to be agreed with, argued with, or corrected — this is that reply.
+ */
+export type ClaimVerdict = "agreed" | "challenged";
+
+export interface ClaimResponse {
+  verdict: ClaimVerdict;
+  /**
+   * What the counterparty says it should say instead. Deliberately a proposal:
+   * accepting it into the copy is an explicit rep action, so the rep's draft is
+   * never silently overwritten and they can see exactly what was changed.
+   */
+  suggestion?: string;
+  /** Free-text reasoning shown alongside the claim. */
+  note?: string;
+  /** ISO timestamp of the reply. */
+  at: string;
+  /** Who replied, captured at reply time so it survives a contact rename. */
+  by: string;
+}
+
 /** Measured buyer telemetry — read-only, not rep-editable copy. */
 export interface EngagementRow {
   id: string;
@@ -160,6 +184,8 @@ export interface Room {
   /** Recorded videos not yet surfaced in the room. */
   library: RoomVideo[];
   curatedVideoIds: string[];
+  /** Counterparty replies to individual claims, keyed by claim id. */
+  responses: Record<string, ClaimResponse>;
   engagement: EngagementRow[];
   /** ISO timestamp; rendered as a relative label. Real telemetry once a backend exists. */
   lastViewedAt: string | null;

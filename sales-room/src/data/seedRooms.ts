@@ -75,6 +75,7 @@ export function seedRooms(): Room[] {
       videos: clone(VIDEOS),
       library: clone(LIBRARY),
       curatedVideoIds: VIDEOS.map((v) => v.id),
+      responses: {},
       engagement: clone(ENGAGEMENT),
       lastViewedAt: new Date(now - 2 * HOURS).toISOString(),
       updatedAt: new Date(now).toISOString(),
@@ -100,6 +101,7 @@ export function seedRooms(): Room[] {
       videos: clone(VIDEOS).slice(0, 2),
       library: clone(LIBRARY),
       curatedVideoIds: VIDEOS.slice(0, 2).map((v) => v.id),
+      responses: {},
       engagement: [
         { id: "framing", label: "Where we fit", time: "2m 10s", pct: 64 },
         { id: "year-one", label: "Year one", time: "1m 32s", pct: 38 },

@@ -64,6 +64,14 @@ export function ChatIcon({ size = 13, className }: IconProps) {
   );
 }
 
+export function FlagIcon({ size = 13, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={2} className={className} {...strokeProps}>
+      <path d="M5 21V4M5 4h10l-1.5 3.5L15 11H5" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ size = 15, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth={2.4} className={className} {...strokeProps}>

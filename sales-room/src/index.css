@@ -38,6 +38,9 @@
   --color-green-bg: #eafbf6;
   --color-live: #10cf9e;
   --color-red: #ff5757;
+  /* Pushback is a signal, not a failure, so it reads amber rather than red. */
+  --color-amber: #b45309;
+  --color-amber-bg: #fdf3e7;
   --color-ink: #111827;
   --color-body: #374151;
   --color-muted: #6b7280;

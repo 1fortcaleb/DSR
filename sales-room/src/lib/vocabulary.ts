@@ -45,6 +45,22 @@ export function firstName(fullName: string): string {
 }
 
 /** Coarse relative time. Real telemetry replaces the source, not this formatter. */
+/**
+ * Bare elapsed time ("just now", "4h", "2d") for timestamps that already sit
+ * under their own label. relativeTime is phrased for room telemetry and reads
+ * wrong anywhere else.
+ */
+export function shortAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
 export function relativeTime(iso: string | null): string {
   if (!iso) return "Not opened yet";
   const then = new Date(iso).getTime();
