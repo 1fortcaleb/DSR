@@ -2,10 +2,9 @@ import type { Audience, RoomView } from "../types";
 import { useRooms } from "../context/RoomsContext";
 import { firstName, relativeTime } from "../lib/vocabulary";
 import { ChatIcon, DocIcon, FolderIcon, SlidersIcon, UsersIcon, VideoIcon } from "./icons";
-// Dark-ground lockup, derived from logo-1fort.png: the neutral wordmark is
-// whitened, the blue/indigo mark is untouched. Regenerate from that source
-// rather than editing this file if the logo ever changes.
-import logo from "../assets/logo-1fort-dark.png";
+// Wordmark only, cropped from logo-1fort.png with the neutral glyphs whitened
+// for the dark ground. Regenerate from that source rather than editing this.
+import wordmark from "../assets/wordmark-1fort-dark.png";
 
 interface SidebarProps {
   audience: Audience;
@@ -36,7 +35,9 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
   return (
     <aside className="sticky top-0 flex h-screen flex-col gap-[34px] border-r border-nav-line bg-nav px-[22px] pt-7 pb-8 box-border">
       <div className="flex items-center gap-2.5">
-        <img src={logo} alt="1Fort" className="h-5 w-auto" />
+        {/* Height is the glyph height now that the mark is gone, not the
+            lockup's — the circle used to set it and was ~1.8x the type. */}
+        <img src={wordmark} alt="1Fort AI" className="h-[13px] w-auto" />
         <span className="border-l border-nav-line pl-2.5 font-mono text-[10px] tracking-[0.1em] text-nav-faint uppercase">
           {vocabulary.roomNoun}
         </span>
