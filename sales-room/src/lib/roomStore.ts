@@ -35,10 +35,14 @@ export function loadState(): RoomsState {
     const activeRoomId = parsed.rooms.some((r) => r.id === parsed.activeRoomId)
       ? parsed.activeRoomId
       : parsed.rooms[0].id;
-    // Rooms stored before claim responses existed have no `responses` map.
-    // Filling it in beats bumping the schema version, which would re-seed and
-    // throw away the rep's drafts over a purely additive field.
-    const rooms = parsed.rooms.map((r) => ({ ...r, responses: r.responses ?? {} }));
+    // Rooms stored before counterparty feedback existed lack these fields.
+    // Filling them in beats bumping the schema version, which would re-seed and
+    // throw away the rep's drafts over purely additive fields.
+    const rooms = parsed.rooms.map((r) => ({
+      ...r,
+      feedback: r.feedback ?? null,
+      flags: r.flags ?? [],
+    }));
     return { activeRoomId, rooms };
   } catch {
     // Corrupt or unreadable storage (quota, private mode) falls back to seeds.
@@ -136,7 +140,8 @@ export function createRoom(kind: RoomKind, company: string, ownerName: string): 
     videos: [],
     library: [],
     curatedVideoIds: [],
-    responses: {},
+    feedback: null,
+    flags: [],
     engagement: [],
     lastViewedAt: null,
     updatedAt: now,
@@ -148,7 +153,8 @@ export function duplicateRoom(room: Room): Room {
   copy.id = newId("room");
   copy.name = `${room.name} (copy)`;
   copy.status = "draft";
-  copy.responses = {};
+  copy.feedback = null;
+  copy.flags = [];
   copy.lastViewedAt = null;
   copy.updatedAt = new Date().toISOString();
   return copy;

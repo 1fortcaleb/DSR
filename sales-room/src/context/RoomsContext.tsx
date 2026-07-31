@@ -18,8 +18,14 @@ import {
 } from "../lib/roomStore";
 import { GenerationError, generationProvider } from "../lib/generation";
 import { vocabularyFor, type Vocabulary } from "../lib/vocabulary";
-import { findClaim } from "../lib/claims";
-import type { CaseContent, ClaimResponse, ClaimVerdict, Room, RoomKind, RoomStatus } from "../types";
+import type {
+  CaseContent,
+  FlaggedPassage,
+  Room,
+  RoomKind,
+  RoomStatus,
+  Verdict,
+} from "../types";
 
 export type GenerationStatus = "idle" | "working" | "error";
 
@@ -48,18 +54,13 @@ interface RoomsContextValue {
   toggleSource: (id: string) => void;
   renameSource: (id: string, label: string) => void;
 
-  /** Record the counterparty's reply to one claim. */
-  respondToClaim: (
-    claimId: string,
-    reply: { verdict: ClaimVerdict; suggestion?: string; note?: string },
-  ) => void;
-  /** Withdraw a reply, returning the claim to unanswered. */
-  clearResponse: (claimId: string) => void;
-  /**
-   * Fold a suggested rewrite into the copy. Separate from responding on
-   * purpose: only the rep can change what the page says.
-   */
-  acceptSuggestion: (claimId: string) => void;
+  /** The counterparty's verdict on the page. */
+  submitFeedback: (verdict: Verdict, message?: string) => void;
+  withdrawFeedback: () => void;
+  /** Attach a comment to a passage they highlighted. */
+  flagPassage: (quote: string, note: string) => void;
+  resolveFlag: (id: string) => void;
+  removeFlag: (id: string) => void;
 
   status: GenerationStatus;
   error: string | null;
@@ -159,57 +160,63 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     [patchRoom],
   );
 
-  const respondToClaim = useCallback<RoomsContextValue["respondToClaim"]>((claimId, reply) => {
+  /** Mutate only the active room, stamping nothing else. */
+  const patchActive = useCallback((updater: (room: Room) => Room) => {
     setState((prev) => ({
       ...prev,
-      rooms: prev.rooms.map((r) => {
-        if (r.id !== prev.activeRoomId) return r;
-        const response: ClaimResponse = {
-          verdict: reply.verdict,
-          suggestion: reply.suggestion?.trim() || undefined,
-          note: reply.note?.trim() || undefined,
+      rooms: prev.rooms.map((r) => (r.id === prev.activeRoomId ? updater(r) : r)),
+    }));
+  }, []);
+
+  const submitFeedback = useCallback<RoomsContextValue["submitFeedback"]>(
+    (verdict, message) =>
+      patchActive((r) => ({
+        ...r,
+        feedback: {
+          verdict,
+          message: message?.trim() || undefined,
+          at: new Date().toISOString(),
+          by: r.account.counterparty.name || "The counterparty",
+        },
+      })),
+    [patchActive],
+  );
+
+  const withdrawFeedback = useCallback(
+    () => patchActive((r) => ({ ...r, feedback: null })),
+    [patchActive],
+  );
+
+  const flagPassage = useCallback(
+    (quote: string, note: string) =>
+      patchActive((r) => {
+        const flag: FlaggedPassage = {
+          id: `flag-${Math.random().toString(36).slice(2, 9)}`,
+          // Long selections are trimmed: the rep needs to recognise the passage,
+          // not re-read it.
+          quote: quote.trim().slice(0, 240),
+          note: note.trim(),
           at: new Date().toISOString(),
           by: r.account.counterparty.name || "The counterparty",
         };
-        return { ...r, responses: { ...r.responses, [claimId]: response } };
+        return { ...r, flags: [...r.flags, flag] };
       }),
-    }));
-  }, []);
+    [patchActive],
+  );
 
-  const clearResponse = useCallback((claimId: string) => {
-    setState((prev) => ({
-      ...prev,
-      rooms: prev.rooms.map((r) => {
-        if (r.id !== prev.activeRoomId) return r;
-        const { [claimId]: _dropped, ...rest } = r.responses;
-        return { ...r, responses: rest };
-      }),
-    }));
-  }, []);
+  const resolveFlag = useCallback(
+    (id: string) =>
+      patchActive((r) => ({
+        ...r,
+        flags: r.flags.map((f) => (f.id === id ? { ...f, resolved: true } : f)),
+      })),
+    [patchActive],
+  );
 
-  const acceptSuggestion = useCallback((claimId: string) => {
-    setState((prev) => ({
-      ...prev,
-      rooms: prev.rooms.map((r) => {
-        if (r.id !== prev.activeRoomId) return r;
-        const response = r.responses[claimId];
-        const claim = findClaim(r.content, claimId);
-        if (!response?.suggestion || !claim) return r;
-        // The reply stays on the record as an agreement: the point of view was
-        // theirs, and the page now says what they said it should.
-        const responses: Record<string, ClaimResponse> = {
-          ...r.responses,
-          [claimId]: { ...response, verdict: "agreed", suggestion: undefined },
-        };
-        return {
-          ...r,
-          content: claim.apply(r.content, response.suggestion),
-          responses,
-          updatedAt: new Date().toISOString(),
-        };
-      }),
-    }));
-  }, []);
+  const removeFlag = useCallback(
+    (id: string) => patchActive((r) => ({ ...r, flags: r.flags.filter((f) => f.id !== id) })),
+    [patchActive],
+  );
 
   const regenerate = useCallback(() => {
     const runId = ++runIdRef.current;
@@ -277,9 +284,11 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setListItem,
     toggleSource,
     renameSource,
-    respondToClaim,
-    clearResponse,
-    acceptSuggestion,
+    submitFeedback,
+    withdrawFeedback,
+    flagPassage,
+    resolveFlag,
+    removeFlag,
     status,
     error,
     isLive: generationProvider.live,

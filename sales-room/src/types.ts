@@ -117,28 +117,40 @@ export interface CaseContent {
   footerRef: string;
 }
 
-/* ------------------------------------------------------------- responses */
+/* -------------------------------------------------------------- feedback */
 
 /**
- * The counterparty's reaction to one claim on the 1-pager. A business case
- * exists to be agreed with, argued with, or corrected — this is that reply.
+ * The counterparty's answer to the whole page.
+ *
+ * One verdict, not a per-line sign-off: nobody ratifies a one-pager clause by
+ * clause. Agreement is a single gesture, and disagreement is an exception they
+ * describe in their own words.
  */
-export type ClaimVerdict = "agreed" | "challenged";
+export type Verdict = "holds" | "concerns";
 
-export interface ClaimResponse {
-  verdict: ClaimVerdict;
-  /**
-   * What the counterparty says it should say instead. Deliberately a proposal:
-   * accepting it into the copy is an explicit rep action, so the rep's draft is
-   * never silently overwritten and they can see exactly what was changed.
-   */
-  suggestion?: string;
-  /** Free-text reasoning shown alongside the claim. */
-  note?: string;
-  /** ISO timestamp of the reply. */
+export interface RoomFeedback {
+  verdict: Verdict;
+  /** What's off, in their words. Only meaningful alongside "concerns". */
+  message?: string;
   at: string;
-  /** Who replied, captured at reply time so it survives a contact rename. */
+  /** Captured at reply time so it survives a contact rename. */
   by: string;
+}
+
+/**
+ * A specific passage the counterparty highlighted and commented on. Raised by
+ * selecting text, so the page carries no per-line controls and the gesture
+ * costs nothing until they actually want to say something.
+ */
+export interface FlaggedPassage {
+  id: string;
+  /** The text they selected, stored verbatim so the rep sees what they meant. */
+  quote: string;
+  note: string;
+  at: string;
+  by: string;
+  /** Set once the rep has dealt with it. */
+  resolved?: boolean;
 }
 
 /** Measured buyer telemetry — read-only, not rep-editable copy. */
@@ -184,8 +196,10 @@ export interface Room {
   /** Recorded videos not yet surfaced in the room. */
   library: RoomVideo[];
   curatedVideoIds: string[];
-  /** Counterparty replies to individual claims, keyed by claim id. */
-  responses: Record<string, ClaimResponse>;
+  /** Their verdict on the page as a whole; null until they answer. */
+  feedback: RoomFeedback | null;
+  /** Passages they highlighted and commented on. */
+  flags: FlaggedPassage[];
   engagement: EngagementRow[];
   /** ISO timestamp; rendered as a relative label. Real telemetry once a backend exists. */
   lastViewedAt: string | null;

@@ -1,11 +1,12 @@
+import { useRef } from "react";
 import type { Audience } from "../types";
-import { tally } from "../lib/claims";
-import { Claim } from "./Claim";
-import { ResponsesPanel } from "./ResponsesPanel";
 import { useRooms } from "../context/RoomsContext";
 import { firstName } from "../lib/vocabulary";
 import { CheckIcon, RefreshIcon, SparkleIcon } from "./icons";
 import { EditableText } from "./EditableText";
+import { SignOff } from "./SignOff";
+import { SelectionFlagger } from "./SelectionFlagger";
+import { ResponsesPanel } from "./ResponsesPanel";
 
 interface CaseViewProps {
   audience: Audience;
@@ -26,9 +27,8 @@ export function CaseView({ audience }: CaseViewProps) {
     regenerate,
     dismissError,
   } = useRooms();
-  const { content, sources, engagement, account, responses } = activeRoom;
-  const review = tally(content, responses);
-  const ownerFirst = firstName(account.owner.name) || "us";
+  const { content, sources, engagement, account } = activeRoom;
+  const articleRef = useRef<HTMLElement | null>(null);
 
   // Buyers see the same page, rendered inert.
   const ro = !isRep;
@@ -36,28 +36,7 @@ export function CaseView({ audience }: CaseViewProps) {
   return (
     <div className="flex flex-wrap items-start">
       <div className="box-border flex flex-1 min-w-0 basis-[560px] justify-center px-10 pt-11 pb-[88px]">
-        <article className="box-border flex w-full max-w-[880px] flex-col gap-[46px] rounded-[10px] border border-border-soft bg-white px-[68px] pt-16 pb-14 shadow-[0_1px_2px_rgba(0,1,46,0.04),0_30px_60px_-40px_rgba(0,1,46,0.18)]">
-          {!isRep && (
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-border bg-blue-bg px-4 py-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-mono text-[9.5px] tracking-[0.12em] text-blue uppercase">
-                  Your read
-                </span>
-                <p className="m-0 text-[12.5px] leading-[1.5] text-body">
-                  Click any line to agree with it, or tell {ownerFirst} what it should say.
-                </p>
-              </div>
-              {review.answered > 0 && (
-                <div className="flex flex-none items-center gap-3 font-mono text-[10.5px]">
-                  {review.agreed > 0 && <span className="text-green">{review.agreed} agreed</span>}
-                  {review.challenged > 0 && (
-                    <span className="text-amber">{review.challenged} flagged</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
+        <article ref={articleRef} className="box-border flex w-full max-w-[880px] flex-col gap-[46px] rounded-[10px] border border-border-soft bg-white px-[68px] pt-16 pb-14 shadow-[0_1px_2px_rgba(0,1,46,0.04),0_30px_60px_-40px_rgba(0,1,46,0.18)]">
           <header className="flex flex-col gap-[26px]">
             <div className="flex items-start justify-between gap-6">
               <EditableText
@@ -77,16 +56,14 @@ export function CaseView({ audience }: CaseViewProps) {
                 className="font-mono text-[10px] tracking-[0.1em] text-faint uppercase"
               />
             </div>
-            <Claim claimId="headline" label="The headline" text={content.headline} audience={audience}>
-              <EditableText
-                as="h1"
-                readOnly={ro}
-                value={content.headline}
-                onChange={(v) => setField("headline", v)}
-                ariaLabel="Headline"
-                className="m-0 max-w-[15em] text-[40px] leading-[1.1] tracking-[-0.025em] font-bold text-navy"
-              />
-            </Claim>
+            <EditableText
+              as="h1"
+              readOnly={ro}
+              value={content.headline}
+              onChange={(v) => setField("headline", v)}
+              ariaLabel="Headline"
+              className="m-0 max-w-[15em] text-[40px] leading-[1.1] tracking-[-0.025em] font-bold text-navy"
+            />
             <div className="h-1 w-[30px] rounded-full bg-blue" />
           </header>
 
@@ -101,13 +78,7 @@ export function CaseView({ audience }: CaseViewProps) {
             />
             <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono text-[21px] leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase">
               {content.framing.map((line) => (
-                <Claim
-                  key={line.id}
-                  claimId={`framing:${line.id}`}
-                  label={line.lead}
-                  text={line.value}
-                  audience={audience}
-                >
+                <div key={line.id}>
                   <EditableText
                     readOnly={ro}
                     value={line.lead}
@@ -124,7 +95,7 @@ export function CaseView({ audience }: CaseViewProps) {
                     className="text-blue"
                   />
                   {line.id === "cost" ? "." : ""}
-                </Claim>
+                </div>
               ))}
             </div>
           </section>
@@ -150,14 +121,7 @@ export function CaseView({ audience }: CaseViewProps) {
             </div>
             <div className="grid grid-cols-4 gap-[26px]">
               {content.stats.map((stat) => (
-                <Claim
-                  key={stat.id}
-                  claimId={`stat:${stat.id}`}
-                  label={stat.label}
-                  text={stat.unit ? `${stat.value} ${stat.unit}` : stat.value}
-                  audience={audience}
-                  className="flex flex-col gap-1.5"
-                >
+                <div key={stat.id} className="flex flex-col gap-1.5">
                   <div
                     className={`text-[30px] font-bold tracking-[-0.02em] ${
                       stat.accent === "red" ? "text-red" : "text-navy"
@@ -190,7 +154,7 @@ export function CaseView({ audience }: CaseViewProps) {
                     ariaLabel={`Stat label: ${stat.label}`}
                     className="text-[11.5px] leading-[1.45] text-muted"
                   />
-                </Claim>
+                </div>
               ))}
             </div>
           </section>
@@ -240,13 +204,7 @@ export function CaseView({ audience }: CaseViewProps) {
                 ariaLabel="Year one label"
                 className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
               />
-              <Claim
-                claimId="yearOne"
-                label={content.yearOneCaption}
-                text={content.yearOneValue}
-                audience={audience}
-                className="flex flex-col gap-[3px]"
-              >
+              <div className="flex flex-col gap-[3px]">
                 <div className="text-[38px] leading-none font-bold tracking-[-0.03em] text-navy">
                   <EditableText
                     readOnly={ro}
@@ -263,18 +221,11 @@ export function CaseView({ audience }: CaseViewProps) {
                   ariaLabel="Year one caption"
                   className="text-xs text-muted"
                 />
-              </Claim>
+              </div>
               <div className="h-px bg-border" />
               <div className="flex flex-col gap-3">
                 {content.yearOneRows.map((row) => (
-                  <Claim
-                    key={row.id}
-                    claimId={`year:${row.id}`}
-                    label={row.label}
-                    text={row.value}
-                    audience={audience}
-                    className="flex items-baseline justify-between gap-3"
-                  >
+                  <div key={row.id} className="flex items-baseline justify-between gap-3">
                     <EditableText
                       readOnly={ro}
                       value={row.label}
@@ -293,7 +244,7 @@ export function CaseView({ audience }: CaseViewProps) {
                         row.accent === "green" ? "text-green" : "text-gray-900"
                       }`}
                     />
-                  </Claim>
+                  </div>
                 ))}
               </div>
               <EditableText
@@ -321,13 +272,9 @@ export function CaseView({ audience }: CaseViewProps) {
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
               {content.weeks.map((week) => (
-                <Claim
+                <div
                   key={week.id}
-                  claimId={`week:${week.id}`}
-                  label={week.num}
-                  text={week.title}
-                  audience={audience}
-                  className="flex flex-col gap-1.5 rounded-md border border-border px-5 py-[18px]"
+                  className="flex flex-col gap-1.5 rounded-md border border-border bg-white px-5 py-[18px]"
                 >
                   <EditableText
                     readOnly={ro}
@@ -351,7 +298,7 @@ export function CaseView({ audience }: CaseViewProps) {
                     ariaLabel={`${week.num} detail`}
                     className="text-[11.5px] leading-[1.45] text-muted"
                   />
-                </Claim>
+                </div>
               ))}
             </div>
           </section>
@@ -374,8 +321,12 @@ export function CaseView({ audience }: CaseViewProps) {
               className="font-mono text-[10px] text-faint"
             />
           </footer>
+
+          <SignOff audience={audience} />
         </article>
       </div>
+
+      {!isRep && <SelectionFlagger containerRef={articleRef} />}
 
       {!isRep && (
         <div className="box-border flex flex-none basis-[336px] flex-col gap-[26px] px-10 pt-11 pb-[60px]">

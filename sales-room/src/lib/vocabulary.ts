@@ -61,6 +61,16 @@ export function shortAgo(iso: string): string {
   return `${Math.round(hours / 24)}d`;
 }
 
+/**
+ * Same elapsed time as a phrase that reads inside a sentence. Separate from
+ * shortAgo because "just now" takes no "ago" and the compact form takes no
+ * suffix at all.
+ */
+export function agoPhrase(iso: string): string {
+  const short = shortAgo(iso);
+  return short === "just now" || short === "" ? short : `${short} ago`;
+}
+
 export function relativeTime(iso: string | null): string {
   if (!iso) return "Not opened yet";
   const then = new Date(iso).getTime();
