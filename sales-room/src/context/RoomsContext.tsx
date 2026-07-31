@@ -108,7 +108,15 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
           // A brand new account with no rooms would otherwise land on an empty
           // screen with nothing to click.
           const first = makeRoom("deal", "First deal room", OWNER_FALLBACK);
-          await saveRoom(first);
+          try {
+            await saveRoom(first);
+          } catch (err) {
+            // Report it rather than continuing with a room the server rejected:
+            // it would look saved until the next reload lost it.
+            throw new Error(
+              `Couldn't create your first room. ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
           rooms = [first];
         }
         setState({ activeRoomId: rooms[0].id, rooms });
@@ -341,6 +349,36 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         <span className="font-mono text-[11px] tracking-[0.1em] text-nav-faint uppercase">
           Loading rooms
         </span>
+      </div>
+    );
+  }
+
+  // Hydrated but empty means the fetch or the first insert failed. activeRoom
+  // is undefined here, so anything below would throw and blank the page.
+  if (!activeRoom) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-nav px-6">
+        <div className="flex w-full max-w-[520px] flex-col gap-4">
+          <span className="font-mono text-[10px] tracking-[0.14em] text-periwinkle uppercase">
+            Couldn't load
+          </span>
+          <h1 className="m-0 text-[22px] leading-[1.25] font-bold tracking-[-0.02em] text-white">
+            No rooms came back.
+          </h1>
+          <pre className="m-0 overflow-x-auto rounded-md border border-nav-line bg-nav-raised p-3 font-mono text-[11.5px] leading-[1.5] whitespace-pre-wrap text-nav-body">
+            {error ?? "The database returned nothing and no error, which usually means the tables exist but are empty and the first insert was rejected."}
+          </pre>
+          <p className="m-0 text-[11.5px] leading-[1.6] text-nav-faint">
+            Most often this means supabase/schema.sql hasn't been run, or was run
+            before the latest changes. Re-running it is safe.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-fit cursor-pointer rounded-md border-none bg-periwinkle px-4 py-2 font-sans text-[12.5px] font-bold text-nav"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }

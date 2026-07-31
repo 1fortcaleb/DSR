@@ -9,6 +9,7 @@ import { AssetsProvider } from "./context/AssetsContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SharedRoom } from "./components/SharedRoom";
 import { SignIn } from "./components/SignIn";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { Audience, RoomView } from "./types";
 
 /** Share links are /r/<token>. Read once: these pages never client-navigate. */
@@ -79,6 +80,8 @@ export default function App() {
   const token = shareToken();
 
   return (
-    <AuthProvider>{token ? <SharedRoom token={token} /> : <RepApp />}</AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>{token ? <SharedRoom token={token} /> : <RepApp />}</AuthProvider>
+    </ErrorBoundary>
   );
 }
