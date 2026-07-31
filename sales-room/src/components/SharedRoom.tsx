@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { errText } from "../lib/errors";
 import {
   addSharedFlag,
   fetchSharedRoom,
@@ -46,7 +47,7 @@ export function SharedRoom({ token }: { token: string }) {
         setState("ready");
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Couldn't open this page.");
+        setError(errText(err));
         setState("error");
       });
   }, [token]);
@@ -69,7 +70,7 @@ export function SharedRoom({ token }: { token: string }) {
           : p,
       );
       void submitSharedFeedback(token, verdict, message).catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Couldn't send that."),
+        setError(errText(err)),
       );
     },
     [token],
@@ -87,7 +88,7 @@ export function SharedRoom({ token }: { token: string }) {
           setPayload((p) => (p ? { ...p, flags: [...p.flags, flag] } : p)),
         )
         .catch((err: unknown) =>
-          setError(err instanceof Error ? err.message : "Couldn't send that."),
+          setError(errText(err)),
         );
     },
     [token],

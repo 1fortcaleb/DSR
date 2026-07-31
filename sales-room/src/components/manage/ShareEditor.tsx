@@ -7,6 +7,7 @@ import {
   type ShareLink,
 } from "../../lib/api";
 import { isCloud } from "../../lib/supabase";
+import { errText } from "../../lib/errors";
 import { useRooms } from "../../context/RoomsContext";
 import { agoPhrase } from "../../lib/vocabulary";
 import { Button, Section, SelectField, TextField } from "./Field";
@@ -41,7 +42,7 @@ export function ShareEditor() {
     }
     fetchShareLinks(activeRoom.id)
       .then(setLinks)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load links."))
+      .catch((e: unknown) => setError(errText(e)))
       .finally(() => setLoading(false));
   }, [activeRoom.id]);
 
@@ -82,7 +83,7 @@ export function ShareEditor() {
       await navigator.clipboard?.writeText(shareUrl(link.token)).catch(() => undefined);
       setCopied(link.token);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't create that link.");
+      setError(errText(e));
     }
   }
 

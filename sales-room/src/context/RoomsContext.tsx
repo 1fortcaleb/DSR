@@ -17,6 +17,7 @@ import {
   saveState,
 } from "../lib/roomStore";
 import { GenerationError, generationProvider } from "../lib/generation";
+import { errText } from "../lib/errors";
 import { isCloud } from "../lib/supabase";
 import {
   deleteFlag as apiDeleteFlag,
@@ -114,7 +115,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
             // Report it rather than continuing with a room the server rejected:
             // it would look saved until the next reload lost it.
             throw new Error(
-              `Couldn't create your first room. ${err instanceof Error ? err.message : String(err)}`,
+              `Couldn't create your first room. ${errText(err)}`,
             );
           }
           rooms = [first];
@@ -124,7 +125,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Couldn't load your rooms.");
+        setError(errText(err));
         setHydrated(true);
       });
     return () => {
@@ -144,7 +145,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     if (!room) return;
     const t = setTimeout(() => {
       void saveRoom(room).catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Couldn't save."),
+        setError(errText(err)),
       );
     }, 700);
     return () => clearTimeout(t);

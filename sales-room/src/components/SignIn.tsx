@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errText } from "../lib/errors";
 import { useAuth } from "../context/AuthContext";
 import wordmark from "../assets/wordmark-1fort-dark.png";
 
@@ -21,7 +22,7 @@ export function SignIn() {
       if (mode === "in") await signIn(email, password);
       else setNotice(await signUp(email, password));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't sign in.");
+      setError(errText(err));
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createShareLink, fetchShareLinks, shareUrl, type ShareLink } from "../lib/api";
 import { isCloud } from "../lib/supabase";
+import { errText } from "../lib/errors";
 import { useRooms } from "../context/RoomsContext";
 import { firstName } from "../lib/vocabulary";
 import { CheckIcon, XIcon } from "./icons";
@@ -53,7 +54,7 @@ export function ShareButton() {
       await navigator.clipboard?.writeText(shareUrl(made.token)).catch(() => undefined);
       setCopied(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't create the link.");
+      setError(errText(e));
     } finally {
       setBusy(false);
     }

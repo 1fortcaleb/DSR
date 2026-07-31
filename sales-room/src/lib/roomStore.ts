@@ -69,8 +69,17 @@ export function clearState(): void {
   }
 }
 
-function newId(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+function newId(_prefix: string): string {
+  // Must be a UUID: these ids become primary keys in Postgres, where the
+  // column is `uuid`. A readable prefixed id is rejected on insert.
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  // Non-secure contexts have no randomUUID; shape-compatible fallback.
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+    (
+      Number(c) ^
+      (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))
+    ).toString(16),
+  );
 }
 
 const BLANK_CONTENT: CaseContent = {
