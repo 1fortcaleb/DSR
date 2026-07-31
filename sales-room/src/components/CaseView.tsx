@@ -7,6 +7,7 @@ import { EditableText } from "./EditableText";
 import { SignOff } from "./SignOff";
 import { SelectionFlagger } from "./SelectionFlagger";
 import { ResponsesPanel } from "./ResponsesPanel";
+import { ShareButton } from "./ShareButton";
 
 interface CaseViewProps {
   audience: Audience;
@@ -448,9 +449,7 @@ export function CaseView({ audience }: CaseViewProps) {
           </div>
 
           <div className="flex flex-col gap-2.5">
-            <button className="cursor-pointer rounded-[5px] border-none bg-blue px-3.5 py-3 font-sans text-[13px] font-bold text-white transition-all hover:bg-blue-hover active:translate-y-px">
-              Share this page
-            </button>
+            <ShareButton />
             <button className="cursor-pointer rounded-[5px] border border-border bg-white px-3.5 py-3 font-sans text-[13px] font-bold text-gray-800 transition-all hover:border-faintest hover:bg-row-hover">
               Download PDF
             </button>
