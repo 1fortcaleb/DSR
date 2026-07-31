@@ -103,11 +103,18 @@ export async function fetchRooms(): Promise<Room[]> {
 /** Persists the rep-editable half of a room. Feedback and flags are theirs. */
 export async function saveRoom(room: Room): Promise<void> {
   const db = requireSupabase();
-  // owner_id is deliberately not sent. The column defaults to auth.uid() on
-  // insert, and leaving it out of the update keeps the original creator when a
-  // colleague edits the room.
+  // owner_id is sent explicitly rather than left to the column default. The
+  // older owner-scoped policy checks `owner_id = auth.uid()` on insert, so
+  // omitting it fails there with a row-level security error; sending it works
+  // under both that policy and the current team-wide one. A trigger keeps the
+  // original creator when a colleague edits, so this can't rewrite provenance.
+  const { data: auth } = await db.auth.getUser();
+  const ownerId = auth.user?.id;
+  if (!ownerId) throw new Error("Not signed in.");
+
   const { error } = await db.from("rooms").upsert({
     id: room.id,
+    owner_id: ownerId,
     kind: room.kind,
     status: room.status,
     name: room.name,

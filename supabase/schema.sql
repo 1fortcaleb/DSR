@@ -322,3 +322,25 @@ drop trigger if exists enforce_signup_domain on auth.users;
 create trigger enforce_signup_domain
   before insert on auth.users
   for each row execute function public.enforce_signup_domain();
+
+/* -------------------------------------------------- keep creator provenance */
+
+-- The client sends owner_id on every save so it works under either policy
+-- version. This stops that from rewriting who created a room when a colleague
+-- edits it: on update, owner_id is always the value it already had.
+create or replace function public.freeze_owner()
+returns trigger
+language plpgsql as $$
+begin
+  new.owner_id = old.owner_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists rooms_freeze_owner on public.rooms;
+create trigger rooms_freeze_owner before update on public.rooms
+  for each row execute function public.freeze_owner();
+
+drop trigger if exists assets_freeze_owner on public.assets;
+create trigger assets_freeze_owner before update on public.assets
+  for each row execute function public.freeze_owner();
