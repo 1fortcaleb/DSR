@@ -1,0 +1,12 @@
+# The app lives in a subdirectory, so the build runs from there.
+[build]
+  base = "sales-room"
+  command = "npm run build"
+  publish = "dist"
+
+# Every /r/<token> is a client-side route with no file behind it. Without this
+# a recipient opening a share link gets a 404 from the CDN, not the room.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
