@@ -7,8 +7,10 @@ import { ImageIcon, SlidersIcon } from "../icons";
 import { Button, SelectField, TextField } from "./Field";
 import { AccountEditor, CaseEditor, DocumentsEditor, SourcesEditor, VideosEditor } from "./editors";
 import { AssetsEditor } from "./AssetsEditor";
+import { ShareEditor } from "./ShareEditor";
+import { useAuth } from "../../context/AuthContext";
 
-type SectionId = "account" | "case" | "sources" | "documents" | "videos";
+type SectionId = "account" | "case" | "sources" | "documents" | "videos" | "share";
 
 /** Per-room sections. The asset library is deliberately not one of these — it
  *  spans rooms, so filing it under a single room's name would be a lie. */
@@ -18,6 +20,7 @@ const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
   { id: "sources", label: "Sources", hint: "What it generates from" },
   { id: "documents", label: "Documents", hint: "Files in the room" },
   { id: "videos", label: "Video answers", hint: "What's visible" },
+  { id: "share", label: "Send", hint: "Links you've sent to the counterparty" },
 ];
 
 /** Keeps the docked preview legible; also sets the width it renders at. */
@@ -160,10 +163,12 @@ export function ManageView({ onExit }: { onExit: () => void }) {
           </button>
         </div>
 
+        <AccountFooter />
+
         <button
           onClick={resetAll}
           title="Discard all local edits in every room"
-          className="mt-auto w-full cursor-pointer rounded-md border-none bg-transparent px-2.5 py-1.5 text-left font-sans text-[11px] text-nav-faint transition-colors hover:text-red"
+          className="w-full cursor-pointer rounded-md border-none bg-transparent px-2.5 py-1.5 text-left font-sans text-[11px] text-nav-faint transition-colors hover:text-red"
         >
           Reset all to defaults
         </button>
@@ -269,6 +274,7 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                   {section === "sources" && <SourcesEditor />}
                   {section === "documents" && <DocumentsEditor />}
                   {section === "videos" && <VideosEditor />}
+                {section === "share" && <ShareEditor />}
                 </>
               )}
             </div>
@@ -301,6 +307,23 @@ export function ManageView({ onExit }: { onExit: () => void }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Who you're signed in as, and the way out. Hidden in local mode. */
+function AccountFooter() {
+  const { cloud, email, signOut } = useAuth();
+  if (!cloud) return null;
+  return (
+    <div className="mt-auto flex flex-col gap-1 border-t border-nav-line pt-3">
+      <span className="truncate px-2.5 font-mono text-[9.5px] text-nav-faint">{email}</span>
+      <button
+        onClick={() => void signOut()}
+        className="w-full cursor-pointer rounded-md border-none bg-transparent px-2.5 py-1.5 text-left font-sans text-[11px] text-nav-body transition-colors hover:text-white"
+      >
+        Sign out
+      </button>
     </div>
   );
 }

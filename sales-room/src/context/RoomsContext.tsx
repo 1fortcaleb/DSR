@@ -17,6 +17,14 @@ import {
   saveState,
 } from "../lib/roomStore";
 import { GenerationError, generationProvider } from "../lib/generation";
+import { isCloud } from "../lib/supabase";
+import {
+  deleteFlag as apiDeleteFlag,
+  deleteRoom as apiDeleteRoom,
+  fetchRooms,
+  saveRoom,
+  setFlagResolved,
+} from "../lib/api";
 import { vocabularyFor, type Vocabulary } from "../lib/vocabulary";
 import type {
   CaseContent,
@@ -71,21 +79,68 @@ interface RoomsContextValue {
   resetAll: () => void;
 }
 
-const RoomsContext = createContext<RoomsContextValue | null>(null);
+// Exported so the counterparty's shared view can supply the same shape from a
+// share token instead of local state, and reuse the whole renderer.
+// eslint-disable-next-line react-refresh/only-export-components
+export const RoomsContext = createContext<RoomsContextValue | null>(null);
+export type { RoomsContextValue };
 
 const OWNER_FALLBACK = "Rachel Moss";
 
 export function RoomsProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState(loadState);
+  // In cloud mode the server is the source of truth, so we start empty rather
+  // than flashing another account's locally cached rooms.
+  const [state, setState] = useState(() => (isCloud ? { activeRoomId: "", rooms: [] } : loadState()));
+  const [hydrated, setHydrated] = useState(!isCloud);
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const runIdRef = useRef(0);
+  const hydratingRef = useRef(false);
 
-  // Persist on every change. Cheap at this data size; swap for a debounce or a
-  // real backend when rooms grow beyond a handful.
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    if (!isCloud || hydratingRef.current) return;
+    hydratingRef.current = true;
+    let cancelled = false;
+    void fetchRooms()
+      .then(async (rooms) => {
+        if (cancelled) return;
+        if (!rooms.length) {
+          // A brand new account with no rooms would otherwise land on an empty
+          // screen with nothing to click.
+          const first = makeRoom("deal", "First deal room", OWNER_FALLBACK);
+          await saveRoom(first);
+          rooms = [first];
+        }
+        setState({ activeRoomId: rooms[0].id, rooms });
+        setHydrated(true);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Couldn't load your rooms.");
+        setHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Local mode writes straight through. Cloud mode debounces so a burst of
+  // keystrokes in an inline editor is one round trip, not thirty.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!isCloud) {
+      saveState(state);
+      return;
+    }
+    const room = state.rooms.find((r) => r.id === state.activeRoomId);
+    if (!room) return;
+    const t = setTimeout(() => {
+      void saveRoom(room).catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : "Couldn't save."),
+      );
+    }, 700);
+    return () => clearTimeout(t);
+  }, [state, hydrated]);
 
   const activeRoom = useMemo(
     () => state.rooms.find((r) => r.id === state.activeRoomId) ?? state.rooms[0],
@@ -205,16 +260,21 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   );
 
   const resolveFlag = useCallback(
-    (id: string) =>
-      patchActive((r) => ({
+    (id: string) => {
+      if (isCloud) void setFlagResolved(id, true).catch(() => undefined);
+      return patchActive((r) => ({
         ...r,
         flags: r.flags.map((f) => (f.id === id ? { ...f, resolved: true } : f)),
-      })),
+      }));
+    },
     [patchActive],
   );
 
   const removeFlag = useCallback(
-    (id: string) => patchActive((r) => ({ ...r, flags: r.flags.filter((f) => f.id !== id) })),
+    (id: string) => {
+      if (isCloud) void apiDeleteFlag(id).catch(() => undefined);
+      return patchActive((r) => ({ ...r, flags: r.flags.filter((f) => f.id !== id) }));
+    },
     [patchActive],
   );
 
@@ -248,6 +308,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const createRoom = useCallback((kind: RoomKind, company: string) => {
     const room = makeRoom(kind, company.trim() || "Untitled room", OWNER_FALLBACK);
     setState((prev) => ({ activeRoomId: room.id, rooms: [...prev.rooms, room] }));
+    if (isCloud) void saveRoom(room).catch(() => setError("Couldn't create that room."));
     return room.id;
   }, []);
 
@@ -256,10 +317,12 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     if (!source) return id;
     const copy = copyRoom(source);
     setState((prev) => ({ activeRoomId: copy.id, rooms: [...prev.rooms, copy] }));
+    if (isCloud) void saveRoom(copy).catch(() => setError("Couldn't duplicate that room."));
     return copy.id;
   }, []);
 
   const deleteRoom = useCallback((id: string) => {
+    if (isCloud) void apiDeleteRoom(id).catch(() => setError("Couldn't delete that room."));
     setState((prev) => {
       // Never leave the app with zero rooms — there'd be nothing to render.
       if (prev.rooms.length <= 1) return prev;
@@ -268,6 +331,19 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       return { activeRoomId, rooms };
     });
   }, []);
+
+  // Must precede `value`: it dereferences activeRoom, which is undefined
+  // until the first fetch lands. Every hook above has already run, so an
+  // early return here is safe.
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-nav">
+        <span className="font-mono text-[11px] tracking-[0.1em] text-nav-faint uppercase">
+          Loading rooms
+        </span>
+      </div>
+    );
+  }
 
   const value: RoomsContextValue = {
     rooms: state.rooms,

@@ -6,7 +6,16 @@ import { VideosView } from "./components/VideosView";
 import { ManageView } from "./components/manage/ManageView";
 import { RoomsProvider, useRooms } from "./context/RoomsContext";
 import { AssetsProvider } from "./context/AssetsContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { SharedRoom } from "./components/SharedRoom";
+import { SignIn } from "./components/SignIn";
 import type { Audience, RoomView } from "./types";
+
+/** Share links are /r/<token>. Read once: these pages never client-navigate. */
+function shareToken(): string | null {
+  const m = window.location.pathname.match(/^\/r\/([A-Za-z0-9_-]{16,})\/?$/);
+  return m ? m[1] : null;
+}
 
 function Room() {
   const [audience, setAudience] = useState<Audience>("rep");
@@ -40,12 +49,36 @@ function Room() {
   );
 }
 
-export default function App() {
+/** The rep side: gated when there's a backend, open when running locally. */
+function RepApp() {
+  const { cloud, session, loading } = useAuth();
+
+  if (cloud && loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-nav">
+        <span className="font-mono text-[11px] tracking-[0.1em] text-nav-faint uppercase">
+          Loading
+        </span>
+      </div>
+    );
+  }
+  if (cloud && !session) return <SignIn />;
+
   return (
     <AssetsProvider>
       <RoomsProvider>
         <Room />
       </RoomsProvider>
     </AssetsProvider>
+  );
+}
+
+export default function App() {
+  // A prospect's link is public and must not sit behind the sign-in gate, so
+  // it is resolved before auth is even considered.
+  const token = shareToken();
+
+  return (
+    <AuthProvider>{token ? <SharedRoom token={token} /> : <RepApp />}</AuthProvider>
   );
 }
