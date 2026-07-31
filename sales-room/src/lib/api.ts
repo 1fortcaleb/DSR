@@ -103,13 +103,11 @@ export async function fetchRooms(): Promise<Room[]> {
 /** Persists the rep-editable half of a room. Feedback and flags are theirs. */
 export async function saveRoom(room: Room): Promise<void> {
   const db = requireSupabase();
-  const { data: session } = await db.auth.getUser();
-  const ownerId = session.user?.id;
-  if (!ownerId) throw new Error("Not signed in.");
-
+  // owner_id is deliberately not sent. The column defaults to auth.uid() on
+  // insert, and leaving it out of the update keeps the original creator when a
+  // colleague edits the room.
   const { error } = await db.from("rooms").upsert({
     id: room.id,
-    owner_id: ownerId,
     kind: room.kind,
     status: room.status,
     name: room.name,

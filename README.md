@@ -64,8 +64,14 @@ variables — Vite inlines them at build, so changing them means rebuilding.
 
 ## How access works
 
-Reps sign in with email and password. Row level security scopes every table to
-`owner_id = auth.uid()`, so a rep can only ever read and write their own rooms.
+Reps sign in with email and password, and sign-up is limited to 1Fort email
+addresses by a trigger on `auth.users` — enforced in the database, because the
+sign-in page can be bypassed by calling the auth endpoint directly.
+
+Access is then team-wide: any signed-in user can read and write any room, so
+nobody's deals or feedback get stranded when they leave or are on holiday.
+`owner_id` still records who created a room. This is safe *only* because of the
+sign-up restriction — if that list is ever widened, tighten the policies first.
 
 Recipients get an unguessable 24-byte token and no account. Anonymous callers
 have **no direct table access at all** — `revoke all ... from anon`. Their only

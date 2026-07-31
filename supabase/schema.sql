@@ -7,7 +7,8 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.rooms (
   id                uuid primary key default gen_random_uuid(),
-  owner_id          uuid not null references auth.users(id) on delete cascade,
+  -- Who created it. Provenance only — access is team-wide, see the policies.
+  owner_id          uuid not null default auth.uid() references auth.users(id) on delete cascade,
   kind              text not null check (kind in ('deal', 'partnership')),
   status            text not null default 'draft' check (status in ('draft', 'live', 'archived')),
   -- Internal label for the rooms index. Never sent to the counterparty.
@@ -71,7 +72,7 @@ create index if not exists flags_room_idx on public.flags (room_id, at desc);
 -- a shared room renders its poster frames without touching Storage at all.
 create table if not exists public.assets (
   id           uuid primary key default gen_random_uuid(),
-  owner_id     uuid not null references auth.users(id) on delete cascade,
+  owner_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name         text not null,
   kind         text not null check (kind in ('image', 'video', 'document')),
   mime_type    text not null,
@@ -109,33 +110,44 @@ alter table public.assets      enable row level security;
 revoke all on public.rooms, public.share_links, public.feedback, public.flags, public.assets
   from anon;
 
+-- Access is team-wide: any signed-in user can read and write any room.
+-- That is deliberate, and it is safe only because sign-up is restricted to
+-- 1Fort email addresses by the trigger at the foot of this file. If that
+-- restriction is ever loosened, these policies must be tightened first.
+--
+-- Rooms outlive the rep who made them: nobody's deals or feedback get stranded
+-- because they left or are on holiday. owner_id still records who created it.
+
 drop policy if exists rooms_owner_all on public.rooms;
-create policy rooms_owner_all on public.rooms
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+drop policy if exists rooms_team_all on public.rooms;
+create policy rooms_team_all on public.rooms
+  for all to authenticated using (true) with check (true);
 
 drop policy if exists share_links_owner_all on public.share_links;
-create policy share_links_owner_all on public.share_links
-  for all to authenticated
-  using (exists (select 1 from public.rooms r where r.id = room_id and r.owner_id = auth.uid()))
-  with check (exists (select 1 from public.rooms r where r.id = room_id and r.owner_id = auth.uid()));
+drop policy if exists share_links_team_all on public.share_links;
+create policy share_links_team_all on public.share_links
+  for all to authenticated using (true) with check (true);
 
 drop policy if exists feedback_owner_all on public.feedback;
-create policy feedback_owner_all on public.feedback
-  for all to authenticated
-  using (exists (select 1 from public.rooms r where r.id = room_id and r.owner_id = auth.uid()))
-  with check (exists (select 1 from public.rooms r where r.id = room_id and r.owner_id = auth.uid()));
+drop policy if exists feedback_team_all on public.feedback;
+create policy feedback_team_all on public.feedback
+  for all to authenticated using (true) with check (true);
 
 drop policy if exists flags_owner_all on public.flags;
-create policy flags_owner_all on public.flags
-  for all to authenticated
-  using (exists (select 1 from public.rooms r where r.id = room_id and r.owner_id = auth.uid()))
-  with check (exists (select 1 from public.rooms r where r.id = room_id and r.owner_id = auth.uid()));
+drop policy if exists flags_team_all on public.flags;
+create policy flags_team_all on public.flags
+  for all to authenticated using (true) with check (true);
 
+-- The asset library is shared across rooms, so it is shared across people too.
 drop policy if exists assets_owner_all on public.assets;
-create policy assets_owner_all on public.assets
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+drop policy if exists assets_team_all on public.assets;
+create policy assets_team_all on public.assets
+  for all to authenticated using (true) with check (true);
+
+-- Existing installs: switch owner_id to a default so an edit by a colleague
+-- doesn't rewrite who created the room.
+alter table public.rooms  alter column owner_id set default auth.uid();
+alter table public.assets alter column owner_id set default auth.uid();
 
 /* ------------------------------------------------- the anonymous share path */
 
@@ -278,14 +290,13 @@ insert into storage.buckets (id, name, public)
 values ('assets', 'assets', false)
 on conflict (id) do nothing;
 
--- Reps reach their own files under a folder named for their user id. The
+-- One shared library for the team, matching the room policies. The
 -- counterparty never touches Storage: poster frames travel as the data URI
 -- thumbnail on the asset row.
 drop policy if exists assets_rw on storage.objects;
 create policy assets_rw on storage.objects
   for all to authenticated
-  using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
-  with check (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'assets') with check (bucket_id = 'assets');
 
 /* ------------------------------------------------- who may create an account */
 
