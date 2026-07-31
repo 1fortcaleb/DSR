@@ -40,7 +40,9 @@ export function SignIn() {
             {mode === "in" ? "Sign in" : "Create an account"}
           </h1>
           <p className="m-0 text-[12.5px] leading-[1.5] text-nav-muted">
-            Deal rooms and everything the counterparty sends back.
+            {mode === "in"
+              ? "Deal rooms and everything the counterparty sends back."
+              : "1Fort email addresses only."}
           </p>
         </div>
 

@@ -286,3 +286,28 @@ create policy assets_rw on storage.objects
   for all to authenticated
   using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+/* ------------------------------------------------- who may create an account */
+
+-- Sign-up is otherwise open to anyone who finds the URL. Row level security
+-- means a stranger would see none of your rooms, but an open registration form
+-- on a company tool holding prospect data is not acceptable on its own.
+--
+-- Enforced by a trigger rather than in the client, because the client can be
+-- bypassed by calling the auth endpoint directly. Edit the domain list here.
+create or replace function public.enforce_signup_domain()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.email is null
+     or lower(split_part(new.email, '@', 2)) not in ('1fort.ai', '1fort.com') then
+    raise exception 'Sign-up is limited to 1Fort email addresses.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_signup_domain on auth.users;
+create trigger enforce_signup_domain
+  before insert on auth.users
+  for each row execute function public.enforce_signup_domain();
