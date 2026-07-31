@@ -321,15 +321,15 @@ export function CaseView({ audience }: CaseViewProps) {
               className="font-mono text-[10px] text-faint"
             />
           </footer>
-
-          <SignOff audience={audience} />
         </article>
       </div>
 
       {!isRep && <SelectionFlagger containerRef={articleRef} />}
 
       {!isRep && (
-        <div className="box-border flex flex-none basis-[336px] flex-col gap-[26px] px-10 pt-11 pb-[60px]">
+        <div className="sticky top-0 box-border flex max-h-screen flex-none basis-[336px] flex-col gap-[26px] overflow-y-auto px-10 pt-11 pb-[60px]">
+          <SignOff />
+
           <div className="flex flex-col gap-3.5 rounded-[10px] border border-border bg-white p-5">
             <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">Your contact</span>
             <div className="flex items-center gap-2.5">
