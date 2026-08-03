@@ -15,6 +15,14 @@ import {
   putAsset,
 } from "../lib/assetStore";
 import { AssetGenerationError, assetGenerationProvider } from "../lib/assetGeneration";
+import {
+  deleteCloudAsset,
+  listCloudAssets,
+  putCloudAsset,
+  renameCloudAsset,
+} from "../lib/assetCloud";
+import { errText } from "../lib/errors";
+import { isCloud } from "../lib/supabase";
 import { kindOf, makeThumbnail } from "../lib/thumbnails";
 import type { Asset, AssetKind } from "../types";
 
@@ -39,7 +47,9 @@ interface AssetsContextValue {
 const AssetsContext = createContext<AssetsContextValue | null>(null);
 
 function newId(): string {
-  return `ast-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  // Must be a UUID: this becomes the assets primary key in Postgres, and it is
+  // also the Storage folder, so it doubles as the unguessable part of the URL.
+  return crypto.randomUUID();
 }
 
 export function AssetsProvider({ children }: { children: ReactNode }) {
@@ -50,12 +60,12 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    listAssets()
+    (isCloud ? listCloudAssets() : listAssets())
       .then((list) => {
         if (!cancelled) setAssets(list);
       })
-      .catch(() => {
-        if (!cancelled) setError("Couldn't open the asset library.");
+      .catch((err: unknown) => {
+        if (!cancelled) setError(errText(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -79,8 +89,10 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
       ...(prompt ? { prompt } : {}),
       createdAt: new Date().toISOString(),
     };
-    await putAsset(asset, file);
-    setAssets((prev) => [asset, ...prev]);
+    // Cloud: bytes to Storage, row to Postgres, so the counterparty can reach
+    // it. Local: IndexedDB, which only this browser can see.
+    const saved = isCloud ? await putCloudAsset(asset, file) : (await putAsset(asset, file), asset);
+    setAssets((prev) => [saved, ...prev]);
   }, []);
 
   const upload = useCallback(
@@ -103,7 +115,8 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
   );
 
   const remove = useCallback(async (id: string) => {
-    await deleteAsset(id);
+    if (isCloud) await deleteCloudAsset(id);
+    else await deleteAsset(id);
     setAssets((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
@@ -111,6 +124,11 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     async (id: string, name: string) => {
       const asset = assets.find((a) => a.id === id);
       if (!asset) return;
+      if (isCloud) {
+        await renameCloudAsset(id, name);
+        setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
+        return;
+      }
       const url = await assetObjectUrl(id);
       if (!url) return;
       try {
@@ -159,7 +177,12 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     remove,
     rename,
     generate,
-    openUrl: assetObjectUrl,
+    openUrl: async (id: string) => {
+      // A hosted asset already has a URL anyone can fetch; only a local-only
+      // one needs a blob handle minting from IndexedDB.
+      const hosted = assets.find((a) => a.id === id)?.url;
+      return hosted ?? (isCloud ? null : assetObjectUrl(id));
+    },
     clearAll,
     dismissError: () => setError(null),
   };

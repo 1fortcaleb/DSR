@@ -226,7 +226,7 @@ export interface SharedRoomPayload {
   recipientName: string | null;
   feedback: RoomFeedback | null;
   flags: FlaggedPassage[];
-  assets: { id: string; name: string; kind: string; thumbnail: string | null }[];
+  assets: { id: string; name: string; kind: string; thumbnail: string | null; url?: string }[];
 }
 
 /** Null means the link is unknown, revoked, expired, or the room isn't live. */

@@ -194,6 +194,8 @@ begin
     select jsonb_array_elements(v_room.documents) ->> 'assetId' as x
     union all
     select jsonb_array_elements(v_room.videos) ->> 'posterAssetId'
+    union all
+    select jsonb_array_elements(v_room.videos) ->> 'videoAssetId'
   ) s where x is not null;
 
   return jsonb_build_object(
@@ -220,7 +222,8 @@ begin
     ),
     'assets', (
       select coalesce(jsonb_agg(jsonb_build_object(
-               'id', a.id, 'name', a.name, 'kind', a.kind, 'thumbnail', a.thumbnail)), '[]'::jsonb)
+               'id', a.id, 'name', a.name, 'kind', a.kind,
+               'thumbnail', a.thumbnail, 'url', a.url)), '[]'::jsonb)
         from public.assets a
        where a.id::text = any(v_asset_ids)
     )
@@ -374,3 +377,27 @@ alter table public.rooms
 alter table public.rooms drop constraint if exists rooms_room_mode_check;
 alter table public.rooms
   add constraint rooms_room_mode_check check (room_mode in ('specific', 'archetype'));
+
+/* ---------------------------------------------------------- hosted assets */
+
+-- Asset bytes live in Storage so the counterparty can actually load them; the
+-- row keeps the public URL alongside the thumbnail.
+alter table public.assets add column if not exists url text;
+
+-- Public-read, with every object under its asset's UUID: unguessable but
+-- permanent, the same bargain as an unlisted video link. Anyone holding the
+-- exact URL keeps access even after the room's share link is revoked. Right
+-- for sales collateral, wrong for anything confidential — for that, make the
+-- bucket private and mint short-lived signed URLs from an edge function that
+-- checks the share token.
+update storage.buckets set public = true where id = 'assets';
+
+-- Reps (signed in) manage the objects; everyone can read them.
+drop policy if exists assets_rw on storage.objects;
+create policy assets_rw on storage.objects
+  for all to authenticated
+  using (bucket_id = 'assets') with check (bucket_id = 'assets');
+
+drop policy if exists assets_public_read on storage.objects;
+create policy assets_public_read on storage.objects
+  for select to anon using (bucket_id = 'assets');

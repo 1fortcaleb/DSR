@@ -242,6 +242,8 @@ export interface Asset {
   sizeBytes: number;
   /** Small data URL used in grids and room tiles; null if none could be made. */
   thumbnail: string | null;
+  /** Hosted URL once the bytes are in Storage. Absent in local-only mode. */
+  url?: string;
   origin: AssetOrigin;
   /** Prompt that produced a generated asset. */
   prompt?: string;

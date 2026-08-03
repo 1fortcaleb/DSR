@@ -17,7 +17,7 @@ export function VideoPlayer({
   video: RoomVideo | undefined;
   posterSrc: string | null;
 }) {
-  const { openUrl } = useAssets();
+  const { byId, openUrl } = useAssets();
   const [playing, setPlaying] = useState(false);
   const [assetUrl, setAssetUrl] = useState<string | null>(null);
 
@@ -25,17 +25,25 @@ export function VideoPlayer({
   // <video> element can use.
   useEffect(() => {
     let cancelled = false;
-    if (!video?.videoAssetId) {
+    const id = video?.videoAssetId;
+    if (!id) {
       setAssetUrl(null);
       return;
     }
-    void openUrl(video.videoAssetId).then((u) => {
+    // Hosted assets carry their own URL. Only a local-only one needs a blob
+    // handle minting out of IndexedDB.
+    const hosted = byId.get(id)?.url;
+    if (hosted) {
+      setAssetUrl(hosted);
+      return;
+    }
+    void openUrl(id).then((u) => {
       if (!cancelled) setAssetUrl(u);
     });
     return () => {
       cancelled = true;
     };
-  }, [video?.videoAssetId, openUrl]);
+  }, [video?.videoAssetId, byId, openUrl]);
 
   useEffect(() => setPlaying(false), [video?.id]);
 
