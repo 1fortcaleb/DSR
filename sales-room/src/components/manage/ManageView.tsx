@@ -8,13 +8,15 @@ import { Button, SelectField, TextField } from "./Field";
 import { AccountEditor, CaseEditor, DocumentsEditor, SourcesEditor, VideosEditor } from "./editors";
 import { AssetsEditor } from "./AssetsEditor";
 import { ShareEditor } from "./ShareEditor";
+import { NotesImport } from "./NotesImport";
 import { useAuth } from "../../context/AuthContext";
 
-type SectionId = "account" | "case" | "sources" | "documents" | "videos" | "share";
+type SectionId = "notes" | "account" | "case" | "sources" | "documents" | "videos" | "share";
 
 /** Per-room sections. The asset library is deliberately not one of these — it
  *  spans rooms, so filing it under a single room's name would be a lie. */
 const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
+  { id: "notes", label: "Paste notes", hint: "Start the room from a Granola note" },
   { id: "account", label: "Room & account", hint: "Who this room is for" },
   { id: "case", label: "Business case", hint: "The 1-pager copy" },
   { id: "sources", label: "Sources", hint: "What it generates from" },
@@ -40,7 +42,9 @@ export function ManageView({ onExit }: { onExit: () => void }) {
   } = useRooms();
   // The rail picks a scope: one room's content, or the library that spans rooms.
   const [scope, setScope] = useState<"room" | "library">("room");
-  const [section, setSection] = useState<SectionId>("account");
+  // A new room opens on the paste step: it is the fastest way out of a blank
+  // template, and the alternative is staring at "Headline goes here".
+  const [section, setSection] = useState<SectionId>("notes");
   const [showPreview, setShowPreview] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newKind, setNewKind] = useState<RoomKind>("deal");
@@ -55,7 +59,7 @@ export function ManageView({ onExit }: { onExit: () => void }) {
     setNewCompany("");
     setCreating(false);
     setScope("room");
-    setSection("account");
+    setSection("notes");
   }
 
   return (
@@ -274,6 +278,7 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                   {section === "sources" && <SourcesEditor />}
                   {section === "documents" && <DocumentsEditor />}
                   {section === "videos" && <VideosEditor />}
+                {section === "notes" && <NotesImport />}
                 {section === "share" && <ShareEditor />}
                 </>
               )}

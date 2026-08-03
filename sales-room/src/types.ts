@@ -56,6 +56,8 @@ export interface GeneratedSource {
   id: string;
   label: string;
   used: boolean;
+  /** Full text when the source was pasted in, e.g. meeting notes. */
+  text?: string;
 }
 
 export interface CaseFramingLine {
