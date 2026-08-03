@@ -199,7 +199,7 @@ begin
   return jsonb_build_object(
     'roomId',          v_room.id,
     'kind',            v_room.kind,
-    'mode',            v_room.mode,
+    'mode',            v_room.room_mode,
     'account',         v_room.account,
     'content',         v_room.content,
     'documents',       v_room.documents,
@@ -351,6 +351,26 @@ create trigger assets_freeze_owner before update on public.assets
 -- A room is either about a specific account or about the archetype we're built
 -- for. The archetype version carries no numbers of theirs and can be sent
 -- before discovery. Defaulting to 'specific' keeps existing rows correct.
+--
+-- Named room_mode, not mode: `mode` is an ordered-set aggregate in Postgres,
+-- and a column called that makes PostgREST fail with "WITHIN GROUP is required
+-- for ordered-set aggregate mode".
+do $$
+begin
+  if exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public' and table_name = 'rooms' and column_name = 'mode')
+     and not exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public' and table_name = 'rooms' and column_name = 'room_mode')
+  then
+    alter table public.rooms rename column mode to room_mode;
+  end if;
+end $$;
+
 alter table public.rooms
-  add column if not exists mode text not null default 'specific'
-  check (mode in ('specific', 'archetype'));
+  add column if not exists room_mode text not null default 'specific';
+
+alter table public.rooms drop constraint if exists rooms_room_mode_check;
+alter table public.rooms
+  add constraint rooms_room_mode_check check (room_mode in ('specific', 'archetype'));
