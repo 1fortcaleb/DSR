@@ -7,6 +7,7 @@ import type { FlaggedPassage, Room, RoomFeedback, Verdict } from "../types";
 interface RoomRow {
   id: string;
   kind: Room["kind"];
+  mode: Room["mode"];
   status: Room["status"];
   name: string;
   account: Room["account"];
@@ -33,12 +34,13 @@ export interface ShareLink {
 }
 
 const ROOM_COLUMNS =
-  "id, kind, status, name, account, content, sources, documents, videos, library, curated_video_ids, updated_at";
+  "id, kind, mode, status, name, account, content, sources, documents, videos, library, curated_video_ids, updated_at";
 
 function toRoom(row: RoomRow, feedback: RoomFeedback | null, flags: FlaggedPassage[]): Room {
   return {
     id: row.id,
     kind: row.kind,
+    mode: row.mode ?? "specific",
     status: row.status,
     name: row.name,
     account: row.account,
@@ -116,6 +118,7 @@ export async function saveRoom(room: Room): Promise<void> {
     id: room.id,
     owner_id: ownerId,
     kind: room.kind,
+    mode: room.mode,
     status: room.status,
     name: room.name,
     account: room.account,
@@ -214,6 +217,7 @@ export function shareUrl(token: string): string {
 export interface SharedRoomPayload {
   roomId: string;
   kind: Room["kind"];
+  mode: Room["mode"];
   account: Room["account"];
   content: Room["content"];
   documents: Room["documents"];

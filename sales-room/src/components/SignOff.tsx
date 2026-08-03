@@ -18,6 +18,29 @@ import { CheckIcon, FlagIcon, XIcon } from "./icons";
 export function SignOff() {
   const { activeRoom, submitFeedback, withdrawFeedback } = useRooms();
   const { feedback, account, flags } = activeRoom;
+  // Before discovery the page makes no claim about them, so asking whether it
+  // "holds up" is meaningless. The useful question is whether it describes
+  // them at all — and the answer is a qualification signal.
+  const pre = activeRoom.mode === "archetype";
+  const copy = pre
+    ? {
+        ask: "Is this you?",
+        yes: "That's us",
+        no: "Not really",
+        yesDone: "You said this is you",
+        noDone: "You said it's not quite you",
+        note: "Anything we've got wrong about you?",
+        foot: "highlight anything that doesn't match how you work.",
+      }
+    : {
+        ask: "Does this hold up?",
+        yes: "Agree",
+        no: "Not quite",
+        yesDone: "You agreed",
+        noDone: "You pushed back",
+        note: "What's off?",
+        foot: "highlight anything on the page to say what's wrong with it.",
+      };
   const owner = firstName(account.owner.name) || "your contact";
 
   const [noting, setNoting] = useState(false);
@@ -43,7 +66,7 @@ export function SignOff() {
           >
             {holds ? <CheckIcon size={11} /> : <FlagIcon size={10} />}
           </span>
-          {holds ? "You agreed" : "You pushed back"}
+          {holds ? copy.yesDone : copy.noDone}
         </h2>
 
         {feedback.message && (
@@ -59,7 +82,7 @@ export function SignOff() {
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={holds ? "Anything you'd add?" : `What's off? ${owner} will fix it.`}
+              placeholder={holds ? "Anything you'd add?" : `${copy.note} ${owner} will see it.`}
               className="w-full resize-y rounded-md border border-nav-line bg-nav-raised px-3 py-2 font-sans text-[12.5px] leading-[1.5] text-white outline-none placeholder:text-nav-faint focus:border-periwinkle"
             />
             <div className="flex items-center gap-3">
@@ -116,7 +139,7 @@ export function SignOff() {
       <div className="flex flex-col gap-1">
         <span className={kicker}>Your call</span>
         <h2 className="m-0 text-[17px] leading-[1.25] font-bold tracking-[-0.025em] text-white">
-          Does this hold up?
+          {copy.ask}
         </h2>
       </div>
 
@@ -127,20 +150,19 @@ export function SignOff() {
           className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-nav-line bg-nav-raised px-3 py-3 font-sans text-[13px] font-bold text-white transition-colors hover:border-live hover:bg-live/10"
         >
           <CheckIcon size={14} className="text-live" />
-          Agree
+          {copy.yes}
         </button>
         <button
           onClick={() => submitFeedback("concerns")}
           className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-nav-line bg-nav-raised px-3 py-3 font-sans text-[13px] font-bold text-white transition-colors hover:border-amber hover:bg-amber/10"
         >
           <XIcon size={12} className="text-amber" />
-          Not quite
+          {copy.no}
         </button>
       </div>
 
       <p className="m-0 text-[11px] leading-[1.5] text-nav-faint">
-        {owner} sees your answer straight away. Or highlight anything on the page to say what's
-        wrong with it.
+        {owner} sees your answer straight away. Or {copy.foot}
       </p>
     </section>
   );

@@ -199,6 +199,7 @@ begin
   return jsonb_build_object(
     'roomId',          v_room.id,
     'kind',            v_room.kind,
+    'mode',            v_room.mode,
     'account',         v_room.account,
     'content',         v_room.content,
     'documents',       v_room.documents,
@@ -344,3 +345,12 @@ create trigger rooms_freeze_owner before update on public.rooms
 drop trigger if exists assets_freeze_owner on public.assets;
 create trigger assets_freeze_owner before update on public.assets
   for each row execute function public.freeze_owner();
+
+/* ------------------------------------------------------ pre-call one-pagers */
+
+-- A room is either about a specific account or about the archetype we're built
+-- for. The archetype version carries no numbers of theirs and can be sent
+-- before discovery. Defaulting to 'specific' keeps existing rows correct.
+alter table public.rooms
+  add column if not exists mode text not null default 'specific'
+  check (mode in ('specific', 'archetype'));

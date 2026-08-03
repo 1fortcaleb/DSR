@@ -39,7 +39,7 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
             lockup's — the circle used to set it and was ~1.8x the type. */}
         <img src={wordmark} alt="1Fort AI" className="h-[13px] w-auto" />
         <span className="border-l border-nav-line pl-2.5 font-mono text-[10px] tracking-[0.1em] text-nav-faint uppercase">
-          {vocabulary.roomNoun}
+          {activeRoom.mode === "archetype" ? "Before we talk" : vocabulary.roomNoun}
         </span>
       </div>
 
@@ -47,9 +47,11 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
         <div className="flex flex-col gap-[3px]">
           <div className="text-[19px] font-bold tracking-[-0.01em] text-nav-hi">{account.company}</div>
           <div className="text-xs text-nav-muted">
-            {account.counterparty.name
-              ? `Prepared with ${account.counterparty.name}${account.counterparty.title ? `, ${account.counterparty.title}` : ""}`
-              : "No contact set"}
+            {activeRoom.mode === "archetype"
+              ? "Before the call · no numbers of theirs on it"
+              : account.counterparty.name
+                ? `Prepared with ${account.counterparty.name}${account.counterparty.title ? `, ${account.counterparty.title}` : ""}`
+                : "No contact set"}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -163,7 +165,8 @@ export function Sidebar({ audience, setAudience, view, setView, curatedCount }: 
               {initialsOf(account.counterparty.name)}
             </span>
             <span className="text-xs text-nav-body">
-              {account.counterparty.name || "No contact"} · {account.counterparty.org}
+              {account.counterparty.name || "No contact yet"}
+              {account.counterparty.org ? ` · ${account.counterparty.org}` : ""}
             </span>
           </div>
         </div>

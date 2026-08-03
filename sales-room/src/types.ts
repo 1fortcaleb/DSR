@@ -9,6 +9,16 @@ export type RoomView = "case" | "files" | "videos" | "manage";
 export type RoomKind = "deal" | "partnership";
 export type RoomStatus = "draft" | "live" | "archived";
 
+/**
+ * Who the page is about.
+ *
+ * "specific" is the room built after discovery, with their numbers in it.
+ * "archetype" is the version you can send before you have any: it describes
+ * the kind of operation we're built for, and asks whether that's them. Same
+ * page, same components — the copy is general and the question is different.
+ */
+export type RoomMode = "specific" | "archetype";
+
 export interface RoomParty {
   name: string;
   title: string;
@@ -187,6 +197,7 @@ export interface RoomVideo {
 export interface Room {
   id: string;
   kind: RoomKind;
+  mode: RoomMode;
   status: RoomStatus;
   /** Internal label for the rooms index; not shown to the counterparty. */
   name: string;

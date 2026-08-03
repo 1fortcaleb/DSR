@@ -75,6 +75,7 @@ export function seedRooms(): Room[] {
       videos: clone(VIDEOS),
       library: clone(LIBRARY),
       curatedVideoIds: VIDEOS.map((v) => v.id),
+      mode: "specific" as const,
       feedback: null,
       flags: [],
       engagement: clone(ENGAGEMENT),
@@ -102,6 +103,7 @@ export function seedRooms(): Room[] {
       videos: clone(VIDEOS).slice(0, 2),
       library: clone(LIBRARY),
       curatedVideoIds: VIDEOS.slice(0, 2).map((v) => v.id),
+      mode: "specific" as const,
       feedback: null,
       flags: [],
       engagement: [

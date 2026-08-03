@@ -37,6 +37,7 @@ export function ManageView({ onExit }: { onExit: () => void }) {
     createRoom,
     duplicateRoom,
     deleteRoom,
+    spinOffRoom,
     resetAll,
     vocabulary,
   } = useRooms();
@@ -47,7 +48,7 @@ export function ManageView({ onExit }: { onExit: () => void }) {
   const [section, setSection] = useState<SectionId>("notes");
   const [showPreview, setShowPreview] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [newKind, setNewKind] = useState<RoomKind>("deal");
+  const [newKind, setNewKind] = useState<"deal" | "partnership" | "archetype">("deal");
   const [newCompany, setNewCompany] = useState("");
 
   // The preview mirrors one room, so the library pane hands its width back.
@@ -55,7 +56,8 @@ export function ManageView({ onExit }: { onExit: () => void }) {
 
   function submitNewRoom() {
     if (!newCompany.trim()) return;
-    createRoom(newKind, newCompany);
+    const archetype = newKind === "archetype";
+    createRoom(archetype ? "deal" : (newKind as RoomKind), newCompany, archetype ? "archetype" : "specific");
     setNewCompany("");
     setCreating(false);
     setScope("room");
@@ -103,7 +105,8 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                   </span>
                 </span>
                 <span className="pl-3 font-mono text-[9.5px] tracking-[0.08em] text-nav-faint uppercase">
-                  {room.kind} · {relativeTime(room.lastViewedAt).replace("Last viewed ", "")}
+                  {room.mode === "archetype" ? "pre-call" : room.kind} ·{" "}
+                  {relativeTime(room.lastViewedAt).replace("Last viewed ", "")}
                 </span>
               </button>
             );
@@ -115,14 +118,15 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                 label="Company"
                 value={newCompany}
                 onChange={setNewCompany}
-                placeholder="Acme Brokers"
+                placeholder={newKind === "archetype" ? "Mid-size retail brokers" : "Acme Brokers"}
               />
-              <SelectField<RoomKind>
+              <SelectField<"deal" | "partnership" | "archetype">
                 label="Type"
                 value={newKind}
                 options={[
                   { value: "deal", label: "Deal" },
                   { value: "partnership", label: "Partnership" },
+                  { value: "archetype", label: "Pre-call (archetype)" },
                 ]}
                 onChange={setNewKind}
               />
@@ -268,8 +272,22 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                         >
                           Delete this room
                         </Button>
+                        {activeRoom.mode === "archetype" && (
+                          <Button
+                            variant="primary"
+                            onClick={() => {
+                              const company = window.prompt("Which account is this for?");
+                              if (company?.trim()) spinOffRoom(activeRoomId, company);
+                            }}
+                            title="Copies this page into a room for one account"
+                          >
+                            Start a real room from this
+                          </Button>
+                        )}
                         <span className="ml-auto text-[11px] text-faint">
-                          {vocabulary.roomNoun} for {activeRoom.account.company}
+                          {activeRoom.mode === "archetype"
+                            ? "Pre-call · carries no account's numbers"
+                            : `${vocabulary.roomNoun} for ${activeRoom.account.company}`}
                         </span>
                       </div>
                     </div>

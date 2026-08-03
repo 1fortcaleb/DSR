@@ -99,6 +99,7 @@ export function SharedRoom({ token }: { token: string }) {
     const room: Room = {
       id: payload.roomId,
       kind: payload.kind,
+      mode: payload.mode ?? "specific",
       status: "live",
       // The internal name never leaves the server; the company stands in.
       name: payload.account.company,
@@ -128,6 +129,7 @@ export function SharedRoom({ token }: { token: string }) {
       updateRoom: noop,
       setRoomStatus: noop,
       createRoom: () => room.id,
+      spinOffRoom: () => room.id,
       duplicateRoom: () => room.id,
       deleteRoom: noop,
       setField: noop,

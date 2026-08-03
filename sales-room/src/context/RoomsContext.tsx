@@ -32,6 +32,7 @@ import type {
   FlaggedPassage,
   Room,
   RoomKind,
+  RoomMode,
   RoomStatus,
   Verdict,
 } from "../types";
@@ -47,7 +48,9 @@ interface RoomsContextValue {
   setActiveRoomId: (id: string) => void;
   updateRoom: (id: string, patch: Partial<Room>) => void;
   setRoomStatus: (id: string, status: RoomStatus) => void;
-  createRoom: (kind: RoomKind, company: string) => string;
+  createRoom: (kind: RoomKind, company: string, mode?: RoomMode) => string;
+  /** Turn an archetype into a real room for one account, after the call. */
+  spinOffRoom: (id: string, company: string) => string;
   duplicateRoom: (id: string) => string;
   deleteRoom: (id: string) => void;
 
@@ -314,8 +317,8 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       });
   }, [patchRoom]);
 
-  const createRoom = useCallback((kind: RoomKind, company: string) => {
-    const room = makeRoom(kind, company.trim() || "Untitled room", OWNER_FALLBACK);
+  const createRoom = useCallback((kind: RoomKind, company: string, mode: RoomMode = "specific") => {
+    const room = makeRoom(kind, company.trim() || "Untitled room", OWNER_FALLBACK, mode);
     setState((prev) => ({ activeRoomId: room.id, rooms: [...prev.rooms, room] }));
     if (isCloud) void saveRoom(room).catch(() => setError("Couldn't create that room."));
     return room.id;
@@ -328,6 +331,30 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ activeRoomId: copy.id, rooms: [...prev.rooms, copy] }));
     if (isCloud) void saveRoom(copy).catch(() => setError("Couldn't duplicate that room."));
     return copy.id;
+  }, []);
+
+  const spinOffRoom = useCallback((id: string, company: string) => {
+    const source = stateRef.current.rooms.find((r) => r.id === id);
+    if (!source) return id;
+    // Keeps the archetype's framing as a starting point but drops everything
+    // that belonged to the general version: it is now about one account, and
+    // the benchmark figures have to be replaced with theirs.
+    const room = copyRoom(source);
+    room.mode = "specific";
+    room.name = company.trim() || source.name;
+    room.account = {
+      ...source.account,
+      company: company.trim() || source.account.company,
+      counterparty: { name: "", title: "", org: company.trim() },
+    };
+    room.content = {
+      ...room.content,
+      statsSource: "Replace with their numbers",
+      footerNote: `Prepared for ${company.trim()} by ${source.account.owner.name} · 1Fort`,
+    };
+    setState((prev) => ({ activeRoomId: room.id, rooms: [...prev.rooms, room] }));
+    if (isCloud) void saveRoom(room).catch(() => setError("Couldn't create that room."));
+    return room.id;
   }, []);
 
   const deleteRoom = useCallback((id: string) => {
@@ -393,6 +420,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     updateRoom: patchRoom,
     setRoomStatus: (id, status) => patchRoom(id, { status }),
     createRoom,
+    spinOffRoom,
     duplicateRoom,
     deleteRoom,
     setField,
