@@ -134,6 +134,10 @@ const BLANK_CONTENT: CaseContent = {
  * The pre-call one-pager. No account, no discovery, no numbers of theirs —
  * it describes the operation we're built for and asks whether that's them.
  *
+ * Deliberately says nothing about which line of business or which carriers.
+ * A template that names one is wrong for every rep selling another, and a
+ * carrier list goes stale. Reps narrow it by editing the page.
+ *
  * Every figure here is a benchmark and is labelled as one. The moment a rep
  * passes one off as the prospect's own the page stops being credible, so the
  * copy says "typically" and the footnote says where it came from.
@@ -141,28 +145,28 @@ const BLANK_CONTENT: CaseContent = {
 const ARCHETYPE_CONTENT: CaseContent = {
   kicker: "Business case",
   pageCount: "Before we talk",
-  headline: "If cyber still moves by email, the premium is leaking somewhere you can't see.",
+  headline: "If submissions still move by email, the premium is leaking somewhere you can't see.",
   framingLabel: "The shape of the problem",
   framing: [
     { id: "despite", lead: "Despite", value: "[a full book and good carrier relationships]" },
-    { id: "cant", lead: "you still can't", value: "[quote cyber inside a week]" },
+    { id: "cant", lead: "you still can't", value: "[turn a submission round inside a week]" },
     { id: "means", lead: "which means", value: "[your producers]" },
-    { id: "have-to", lead: "have to", value: "[rekey one application into every portal]" },
+    { id: "have-to", lead: "have to", value: "[rekey one application into every carrier portal]" },
     { id: "cost", lead: "and the cost is", value: "[the submissions nobody ever quotes]" },
   ],
   statsLabel: "What we usually find",
   statsSource: "Typical of the agencies we onboard — not yours yet",
   stats: [
     { id: "days", value: "11", unit: "days", label: "Median submission to first quote", accent: "navy" },
-    { id: "portals", value: "6", unit: "portals", label: "Rekeyed per cyber account", accent: "navy" },
+    { id: "portals", value: "6", unit: "portals", label: "Rekeyed per account", accent: "navy" },
     { id: "unquoted", value: "1 in 3", label: "Submissions never quoted out", accent: "red" },
     { id: "leak", value: "5-figure", label: "Premium left unwritten, per producer, per year", accent: "red" },
   ],
   changesLabel: "What changes",
   changesBody:
-    "Producers submit once in 1Fort. We push to Coalition, At-Bay, Chubb, Corvus, Beazley and Travelers in parallel, return bindable quotes in minutes, and generate the comparison and proposal for you.",
+    "Producers submit once in 1Fort. We push to your markets in parallel, return bindable quotes in minutes, and generate the comparison and proposal for you.",
   changesBullets: [
-    { id: "b1", text: "One application, six markets, no rekeying" },
+    { id: "b1", text: "One application, every market you use, no rekeying" },
     { id: "b2", text: "AI coverage comparison the insured can actually read" },
     { id: "b3", text: "Bind, invoice and collect in the same thread" },
   ],
@@ -175,7 +179,7 @@ const ARCHETYPE_CONTENT: CaseContent = {
     { id: "r3", label: "Typical payback", value: "Under 6 months", accent: "green" },
   ],
   yearOneFootnote:
-    "Ranges from agencies running cyber and tech E&O through 1Fort. We build the version with your numbers in it after one call.",
+    "Ranges from agencies running this line through 1Fort. We build the version with your numbers in it after one call.",
   nextLabel: "If this sounds like you",
   weeks: [
     { id: "w1", num: "STEP 1", title: "A 20-minute call", sub: "Your book, your carriers, where it jams" },
