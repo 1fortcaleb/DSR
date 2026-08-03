@@ -180,6 +180,14 @@ export interface VideoChapter {
 
 export interface RoomVideo {
   id: string;
+  /**
+   * Where the video actually plays from: a Loom/Vidyard/YouTube share link, or
+   * a direct file URL. A link is preferred — it reaches the counterparty with
+   * nothing to host.
+   */
+  url?: string;
+  /** Uploaded video in the asset library, as an alternative to a link. */
+  videoAssetId?: string;
   /** Poster frame from the asset library. */
   posterAssetId?: string;
   kicker: string;

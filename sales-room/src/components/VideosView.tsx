@@ -3,6 +3,7 @@ import type { Audience } from "../types";
 import { useRooms } from "../context/RoomsContext";
 import { useAssets } from "../context/AssetsContext";
 import { ImagePlaceholder } from "./ImagePlaceholder";
+import { VideoPlayer } from "./VideoPlayer";
 import { PlusIcon, RecordIcon, XIcon } from "./icons";
 
 interface VideosViewProps {
@@ -66,11 +67,9 @@ export function VideosView({ audience }: VideosViewProps) {
       {video && (
       <section className="grid grid-cols-[minmax(0,1.55fr)_minmax(280px,1fr)] items-start gap-7">
         <div className="relative w-full overflow-hidden rounded-xl border border-border bg-gray-100 aspect-video">
-          <ImagePlaceholder
-            label="Attach a poster frame in Manage content → Video answers"
+          <VideoPlayer
+            video={video}
             posterSrc={video?.posterAssetId ? assetsById.get(video.posterAssetId)?.thumbnail ?? null : null}
-            withPlayButton
-            duration={video?.dur}
           />
         </div>
 

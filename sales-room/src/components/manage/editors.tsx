@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useRooms } from "../../context/RoomsContext";
+import { providerName } from "../../lib/video";
 import { relativeTime } from "../../lib/vocabulary";
-import type { RoomKind, RoomMode, RoomStatus } from "../../types";
+import type { RoomKind, RoomMode, RoomStatus, RoomVideo } from "../../types";
 import { Button, Grid, ListRow, Section, SelectField, TextField } from "./Field";
 import { AssetPicker } from "./AssetPicker";
 
@@ -466,6 +468,8 @@ export function VideosEditor() {
   const { activeRoom, updateRoom } = useRooms();
   const { videos, library, curatedVideoIds } = activeRoom;
   const all = [...videos, ...library];
+  const [newTitle, setNewTitle] = useState("");
+  const [newUrl, setNewUrl] = useState("");
 
   const inRoom = curatedVideoIds
     .map((id) => all.find((v) => v.id === id))
@@ -475,11 +479,45 @@ export function VideosEditor() {
   const setCurated = (ids: string[]) => updateRoom(activeRoom.id, { curatedVideoIds: ids });
 
   /** A video may live in either list; patch whichever holds it. */
-  const setVideoPoster = (id: string, posterAssetId: string | undefined) =>
+  const patchVideo = (id: string, patch: Partial<RoomVideo>) =>
     updateRoom(activeRoom.id, {
-      videos: videos.map((v) => (v.id === id ? { ...v, posterAssetId } : v)),
-      library: library.map((v) => (v.id === id ? { ...v, posterAssetId } : v)),
+      videos: videos.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+      library: library.map((v) => (v.id === id ? { ...v, ...patch } : v)),
     });
+  const setVideoPoster = (id: string, posterAssetId: string | undefined) =>
+    patchVideo(id, { posterAssetId });
+
+  function addVideo() {
+    if (!newTitle.trim()) return;
+    const video: RoomVideo = {
+      id: `vid-${Math.random().toString(36).slice(2, 9)}`,
+      url: newUrl.trim() || undefined,
+      kicker: "Answer",
+      title: newTitle.trim(),
+      dur: "",
+      by: activeRoom.account.owner.name,
+      placeholder: "Add a poster frame",
+      chapters: [],
+      watched: "",
+      pct: 0,
+      note: "",
+    };
+    // Straight into the room: a rep adding one almost always wants it seen.
+    updateRoom(activeRoom.id, {
+      videos: [...videos, video],
+      curatedVideoIds: [...curatedVideoIds, video.id],
+    });
+    setNewTitle("");
+    setNewUrl("");
+  }
+
+  function removeVideo(id: string) {
+    updateRoom(activeRoom.id, {
+      videos: videos.filter((v) => v.id !== id),
+      library: library.filter((v) => v.id !== id),
+      curatedVideoIds: curatedVideoIds.filter((v) => v !== id),
+    });
+  }
 
   const move = (id: string, delta: number) => {
     const i = curatedVideoIds.indexOf(id);
@@ -493,6 +531,32 @@ export function VideosEditor() {
   return (
     <div className="flex flex-col gap-5">
       <Section
+        title="Add a video answer"
+        hint="Paste a Loom, Vidyard, YouTube or Vimeo link. A link plays for the counterparty straight away with nothing to host — or upload the file under Assets and attach it below."
+      >
+        <Grid>
+          <TextField
+            label="Title"
+            value={newTitle}
+            onChange={setNewTitle}
+            placeholder="Why this is worth a pilot"
+          />
+          <TextField
+            label="Link"
+            value={newUrl}
+            onChange={setNewUrl}
+            placeholder="https://www.loom.com/share/…"
+            hint={providerName(newUrl) ? `Recognised: ${providerName(newUrl)}` : undefined}
+          />
+        </Grid>
+        <div>
+          <Button variant="primary" onClick={addVideo} disabled={!newTitle.trim()}>
+            Add to the room
+          </Button>
+        </div>
+      </Section>
+
+      <Section
         title="Visible in the room"
         hint="Order here is the order the counterparty sees."
       >
@@ -500,12 +564,34 @@ export function VideosEditor() {
         <div className="flex flex-col gap-2">
           {inRoom.map((v, i) => (
             <ListRow key={v.id} onRemove={() => setCurated(curatedVideoIds.filter((x) => x !== v.id))}>
+              <TextField
+                label="Link"
+                value={v.url ?? ""}
+                onChange={(url) => patchVideo(v.id, { url: url.trim() || undefined })}
+                placeholder="https://www.loom.com/share/…"
+                hint={
+                  providerName(v.url)
+                    ? `Plays via ${providerName(v.url)}`
+                    : "No link yet — nothing will play"
+                }
+              />
+              <AssetPicker
+                label="Or an uploaded video"
+                kind="video"
+                assetId={v.videoAssetId}
+                onChange={(videoAssetId) => patchVideo(v.id, { videoAssetId })}
+              />
               <AssetPicker
                 label="Poster frame"
                 kind="image"
                 assetId={v.posterAssetId}
                 onChange={(posterAssetId) => setVideoPoster(v.id, posterAssetId)}
               />
+              <div>
+                <Button variant="danger" onClick={() => removeVideo(v.id)}>
+                  Delete this video
+                </Button>
+              </div>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <div className="flex min-w-0 flex-col">
                   <span className="truncate text-[13px] font-bold text-gray-900">{v.title}</span>
