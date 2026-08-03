@@ -1,6 +1,6 @@
 import { useRooms } from "../../context/RoomsContext";
 import { relativeTime } from "../../lib/vocabulary";
-import type { RoomKind, RoomStatus } from "../../types";
+import type { RoomKind, RoomMode, RoomStatus } from "../../types";
 import { Button, Grid, ListRow, Section, SelectField, TextField } from "./Field";
 import { AssetPicker } from "./AssetPicker";
 
@@ -17,7 +17,7 @@ export function AccountEditor() {
     <div className="flex flex-col gap-5">
       <Section
         title="Room"
-        hint="How this room is filed internally. The counterparty never sees the internal name or status."
+        hint="How this room is filed internally. The counterparty never sees the internal name or status. Switching Page changes the question they're asked, not the words on the page."
       >
         <Grid>
           <TextField
@@ -33,6 +33,15 @@ export function AccountEditor() {
               { value: "partnership", label: "Partnership" },
             ]}
             onChange={(v) => updateRoom(activeRoom.id, { kind: v })}
+          />
+          <SelectField<RoomMode>
+            label="Page"
+            value={activeRoom.mode}
+            options={[
+              { value: "specific", label: "About this account" },
+              { value: "archetype", label: "Pre-call (archetype)" },
+            ]}
+            onChange={(v) => updateRoom(activeRoom.id, { mode: v })}
           />
           <SelectField<RoomStatus>
             label="Status"
