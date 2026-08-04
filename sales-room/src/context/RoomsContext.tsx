@@ -17,8 +17,8 @@ import {
   saveState,
 } from "../lib/roomStore";
 import { GenerationError, generationProvider } from "../lib/generation";
-import { errText } from "../lib/errors";
-import { isCloud } from "../lib/supabase";
+import { errHint, errText } from "../lib/errors";
+import { isCloud, supabase } from "../lib/supabase";
 import {
   deleteFlag as apiDeleteFlag,
   deleteRoom as apiDeleteRoom,
@@ -88,6 +88,12 @@ interface RoomsContextValue {
 // eslint-disable-next-line react-refresh/only-export-components
 export const RoomsContext = createContext<RoomsContextValue | null>(null);
 export type { RoomsContextValue };
+
+/** Clears the stored session, then reloads to the sign-in screen. */
+async function supabaseSignOut() {
+  await supabase?.auth.signOut().catch(() => undefined);
+  window.location.reload();
+}
 
 const OWNER_FALLBACK = "Rachel Moss";
 
@@ -396,16 +402,25 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
           <pre className="m-0 overflow-x-auto rounded-md border border-nav-line bg-nav-raised p-3 font-mono text-[11.5px] leading-[1.5] whitespace-pre-wrap text-nav-body">
             {error ?? "The database returned nothing and no error, which usually means the tables exist but are empty and the first insert was rejected."}
           </pre>
-          <p className="m-0 text-[11.5px] leading-[1.6] text-nav-faint">
-            Most often this means supabase/schema.sql hasn't been run, or was run
-            before the latest changes. Re-running it is safe.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-fit cursor-pointer rounded-md border-none bg-periwinkle px-4 py-2 font-sans text-[12.5px] font-bold text-nav"
-          >
-            Try again
-          </button>
+          <p className="m-0 text-[11.5px] leading-[1.6] text-nav-faint">{errHint(error)}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="cursor-pointer rounded-md border-none bg-periwinkle px-4 py-2 font-sans text-[12.5px] font-bold text-nav"
+            >
+              Try again
+            </button>
+            <button
+              onClick={() => {
+                // A bad or skewed token survives a reload; dropping the stored
+                // session is the only thing that clears it.
+                void supabaseSignOut();
+              }}
+              className="cursor-pointer rounded-md border border-nav-line bg-transparent px-4 py-2 font-sans text-[12.5px] font-bold text-nav-body hover:text-white"
+            >
+              Sign out and start again
+            </button>
+          </div>
         </div>
       </div>
     );
