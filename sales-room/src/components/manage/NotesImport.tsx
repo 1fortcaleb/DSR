@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useRooms } from "../../context/RoomsContext";
-import { isEmptyParse, parseNotes, RULE, type ParsedNotes } from "../../lib/granola";
+import { isEmptyParse, parseNotes, RULE, type ParsedNotes, type ParsedNumber } from "../../lib/granola";
 import { CheckIcon } from "../icons";
 import { Button, Section } from "./Field";
 
 /** Placeholder text from a fresh room — safe to fill over. */
-const PLACEHOLDER = /^(—|-|\[.*\]|Headline goes here\.|Describe what changes for them\.|Metric (one|two|three|four)|(First|Second|Third) (proof point|milestone)|What happens|Source pending|Add the assumptions.*|Prepared by 1Fort|REF-0000|Untitled room)$/i;
+const PLACEHOLDER =
+  /^(—|-|\[.*\]|Headline goes here\.|Describe what changes for them\.|Metric (one|two|three|four)|(First|Second|Third) (proof point|milestone)|What happens|Source pending|Add the assumptions.*|Prepared by 1Fort|REF-0000|Untitled room)$/i;
 
 /**
  * Blank, placeholder, or debris. RULE is in there so a room an earlier import
@@ -18,7 +19,7 @@ const isBlank = (v: string) => !v.trim() || PLACEHOLDER.test(v.trim()) || RULE.t
  * The line the figure came from, with the figure itself taken out — the number
  * is already displayed above the label, so repeating it reads as a stutter.
  */
-function statLabel(n: { value: string; unit?: string; context: string }): string {
+function statLabel(n: ParsedNumber): string {
   const escaped = n.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // No \b around the figure: it can start with "$" or end with "%", neither of
   // which is a word character, so a word boundary never matches there.
@@ -34,19 +35,38 @@ function statLabel(n: { value: string; unit?: string; context: string }): string
   return (text.charAt(0).toUpperCase() + text.slice(1)).slice(0, 70);
 }
 
+/** One field the notes have something to say about. */
+interface Change {
+  key: string;
+  label: string;
+  /** What's on the page now. Empty string when the slot is a placeholder. */
+  current: string;
+  /** What the notes would put there. */
+  next: string;
+  /** True when the slot already holds real content the rep would lose. */
+  occupied: boolean;
+  apply: () => void;
+}
+
 /**
  * Paste meeting notes, get the room started.
  *
- * Everything here is a suggestion. Blank placeholder fields are filled
- * automatically because there is nothing to lose; anything the rep has already
- * written is left alone and offered as a click instead. The raw notes are kept
- * as a source either way, so a later regeneration has the original.
+ * Everything here is a suggestion, and the suggestion is shown in full before
+ * it is taken: which field, what's in it now, what would replace it. The
+ * default is to fill only empty slots, because overwriting someone's writing
+ * without asking is the worse failure — but "leave it alone" silently was its
+ * own kind of broken, so the skipped fields are listed too and can be taken in
+ * one click.
+ *
+ * The raw notes are kept as a source either way, so a later regeneration has
+ * the original.
  */
 export function NotesImport() {
   const { activeRoom, updateRoom, setField, setListItem, renameSource } = useRooms();
   const { content, account } = activeRoom;
   const [text, setText] = useState("");
-  /** null until the rep runs it; an empty array means "nothing was blank". */
+  const [overwrite, setOverwrite] = useState(false);
+  /** null until the rep runs it; an empty array means "nothing was eligible". */
   const [applied, setApplied] = useState<string[] | null>(null);
 
   const parsed: ParsedNotes | null = useMemo(
@@ -72,71 +92,159 @@ export function NotesImport() {
     return atCompany.length ? atCompany : notUs;
   }, [parsed]);
 
+  /**
+   * Everything the notes could change, whether or not it's allowed to.
+   *
+   * Stat slots are allocated differently depending on the mode: when only
+   * empty slots are in play the figures pack into the gaps, and when the notes
+   * are allowed to win they line up from the top. Computing the plan against
+   * the live mode means the preview is what actually happens, rather than an
+   * optimistic version of it.
+   */
+  const plan: Change[] = useMemo(() => {
+    if (!parsed) return [];
+    const out: Change[] = [];
+
+    /** A row saying "Acme Corp → Acme Corp" is noise, not a change. */
+    const add = (c: Change) => {
+      if (c.current !== c.next) out.push(c);
+    };
+
+    if (parsed.company) {
+      const current = account.company === "Untitled room" ? "" : account.company;
+      add({
+        key: "company",
+        label: "Company",
+        current: isBlank(current) ? "" : current,
+        next: parsed.company,
+        occupied: !isBlank(current),
+        apply: () =>
+          updateRoom(activeRoom.id, {
+            name: parsed.company!,
+            account: {
+              ...account,
+              company: parsed.company!,
+              counterparty: { ...account.counterparty, org: parsed.company! },
+            },
+          }),
+      });
+    }
+
+    if (them[0]) {
+      const person = them[0];
+      const current = account.counterparty.name;
+      add({
+        key: "contact",
+        label: "Contact",
+        current: isBlank(current) ? "" : current,
+        next: person.title ? `${person.name} · ${person.title}` : person.name,
+        occupied: !isBlank(current),
+        apply: () =>
+          updateRoom(activeRoom.id, {
+            account: {
+              ...account,
+              company: parsed.company ?? account.company,
+              counterparty: {
+                name: person.name,
+                title: person.title ?? "",
+                org: parsed.company ?? account.counterparty.org,
+              },
+            },
+          }),
+      });
+    }
+
+    const freeStats = content.stats.filter((s) => isBlank(s.value));
+    const statTargets = overwrite ? content.stats : freeStats;
+    parsed.numbers.slice(0, statTargets.length).forEach((n, i) => {
+      const stat = statTargets[i];
+      const at = content.stats.indexOf(stat);
+      const current = isBlank(stat.value) ? "" : `${stat.value}${stat.unit ? ` ${stat.unit}` : ""}`;
+      add({
+        key: `stat-${stat.id}`,
+        label: `Stat ${at + 1}`,
+        current,
+        next: `${n.value}${n.unit ? ` ${n.unit}` : ""} · ${statLabel(n)}`,
+        occupied: !!current,
+        apply: () =>
+          setListItem("stats", stat.id, { value: n.value, unit: n.unit ?? "", label: statLabel(n) }),
+      });
+    });
+
+    parsed.nextSteps.slice(0, content.weeks.length).forEach((step, i) => {
+      const week = content.weeks[i];
+      const current = isBlank(week.title) ? "" : week.title;
+      add({
+        key: `week-${week.id}`,
+        label: `Step ${i + 1}`,
+        current,
+        next: step.slice(0, 60),
+        occupied: !!current,
+        // The sub-line described the title being replaced, so it goes with it.
+        // "Pilot with two producers / Your book, where it jams" is worse than
+        // no sub-line at all.
+        apply: () =>
+          setListItem("weeks", week.id, {
+            title: step.slice(0, 60),
+            ...(isBlank(week.sub) || current ? { sub: "" } : {}),
+          }),
+      });
+    });
+
+    parsed.bullets.slice(0, content.changesBullets.length).forEach((b, i) => {
+      const bullet = content.changesBullets[i];
+      const current = isBlank(bullet.text) ? "" : bullet.text;
+      add({
+        key: `bullet-${bullet.id}`,
+        label: `Point ${i + 1}`,
+        current,
+        next: b.slice(0, 120),
+        occupied: !!current,
+        apply: () => setListItem("changesBullets", bullet.id, { text: b.slice(0, 120) }),
+      });
+    });
+
+    if (parsed.title) {
+      const current = isBlank(content.statsSource) ? "" : content.statsSource;
+      const next = `From ${parsed.title.slice(0, 60)}`;
+      add({
+          key: "statsSource",
+          label: "Figures from",
+          current,
+          next,
+          occupied: !!current,
+          apply: () => setField("statsSource", next),
+      });
+    }
+
+    return out;
+  }, [parsed, them, account, content, activeRoom.id, overwrite, updateRoom, setListItem, setField]);
+
+  // `occupied` is mode-independent, so the override control doesn't unmount the
+  // moment it's used — which would leave no way to switch it back off.
+  const occupied = plan.filter((c) => c.occupied);
+  const willChange = overwrite ? plan : plan.filter((c) => !c.occupied);
+  const skipped = overwrite ? [] : occupied;
+
+  /**
+   * Stats that keep their existing figure while their neighbours get replaced.
+   *
+   * This is the one way this screen can put a falsehood on a customer-facing
+   * page: three of four stats become the prospect's numbers, the source line
+   * starts crediting their call, and the fourth is still the archetype's
+   * typical figure now passing as theirs.
+   */
+  const stranded = willChange.some((c) => c.key.startsWith("stat-"))
+    ? content.stats.filter(
+        (s) => !isBlank(s.value) && !willChange.some((c) => c.key === `stat-${s.id}`),
+      )
+    : [];
+
   function applyAll() {
     if (!parsed) return;
-    const done: string[] = [];
-
-    if (parsed.company && (isBlank(account.company) || account.company === "Untitled room")) {
-      updateRoom(activeRoom.id, {
-        name: parsed.company,
-        account: {
-          ...account,
-          company: parsed.company,
-          counterparty: { ...account.counterparty, org: parsed.company },
-        },
-      });
-      done.push("Company");
-    }
-
-    if (them[0] && isBlank(account.counterparty.name)) {
-      updateRoom(activeRoom.id, {
-        account: {
-          ...account,
-          company: parsed.company ?? account.company,
-          counterparty: {
-            name: them[0].name,
-            title: them[0].title ?? "",
-            org: parsed.company ?? account.counterparty.org,
-          },
-        },
-      });
-      done.push("Contact");
-    }
-
-    // Numbers land in whichever stat slots are still placeholders.
-    let slot = 0;
-    for (const n of parsed.numbers) {
-      while (slot < content.stats.length && !isBlank(content.stats[slot].value)) slot++;
-      if (slot >= content.stats.length) break;
-      setListItem("stats", content.stats[slot].id, {
-        value: n.value,
-        unit: n.unit ?? "",
-        label: statLabel(n),
-      });
-      slot++;
-      done.push("Numbers");
-    }
-
-    // Next steps become the plan.
-    parsed.nextSteps.slice(0, content.weeks.length).forEach((step, i) => {
-      if (!isBlank(content.weeks[i].title)) return;
-      setListItem("weeks", content.weeks[i].id, { title: step.slice(0, 60), sub: "" });
-      done.push("Plan");
-    });
-
-    // Bullets become proof points.
-    parsed.bullets.slice(0, content.changesBullets.length).forEach((b, i) => {
-      if (!isBlank(content.changesBullets[i].text)) return;
-      setListItem("changesBullets", content.changesBullets[i].id, { text: b.slice(0, 120) });
-      done.push("Proof points");
-    });
-
-    if (isBlank(content.statsSource) && parsed.title) {
-      setField("statsSource", `From ${parsed.title.slice(0, 60)}`);
-    }
-
+    for (const change of willChange) change.apply();
     keepAsSource();
-    setApplied([...new Set(done)]);
+    setApplied(willChange.map((c) => c.label));
   }
 
   /** Keeps the notes on the room so a later regeneration can draw on them. */
@@ -163,7 +271,7 @@ export function NotesImport() {
     <div className="flex flex-col gap-5">
       <Section
         title="Paste notes from Granola"
-        hint="Copy the whole note and paste it here. Blank fields get filled in; anything you've already written is left alone."
+        hint="Paste the whole note — a Granola copy-out or a full recorder transcript. You'll see exactly which fields it wants to change before anything happens."
       >
         <textarea
           value={text}
@@ -178,67 +286,85 @@ export function NotesImport() {
 
         {parsed && !nothingFound && (
           <>
-            <div className="flex flex-col gap-2.5 rounded-md border border-border-soft bg-row-hover p-3">
-              <span className="font-mono text-[9.5px] tracking-[0.1em] text-faint uppercase">
-                Found in these notes
-              </span>
-              <div className="flex flex-col gap-1.5 text-[12.5px] leading-[1.5] text-body">
-                {parsed.company && (
-                  <Row label="Company">{parsed.company}</Row>
-                )}
-                {them.length > 0 && (
-                  <Row label="Contact">
-                    {them[0].name}
-                    {(them[0].title ?? them[0].org) && (
-                      <span className="text-muted"> · {them[0].title ?? them[0].org}</span>
-                    )}
-                  </Row>
-                )}
-                {parsed.numbers.length > 0 && (
-                  <Row label="Numbers">
-                    <span className="flex flex-wrap gap-1.5">
-                      {parsed.numbers.map((n, i) => (
-                        <span
-                          key={i}
-                          title={n.context}
-                          className="rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-navy"
-                        >
-                          {n.value}
-                          {n.unit ? ` ${n.unit}` : ""}
-                        </span>
-                      ))}
-                    </span>
-                  </Row>
-                )}
-                {parsed.nextSteps.length > 0 && (
-                  <Row label="Next steps">{parsed.nextSteps.length} found</Row>
-                )}
-                {parsed.bullets.length > 0 && (
-                  <Row label="Points">{parsed.bullets.length} found</Row>
-                )}
+            {willChange.length > 0 && (
+              <div className="flex flex-col gap-2 rounded-md border border-border-soft bg-row-hover p-3">
+                <span className="font-mono text-[9.5px] tracking-[0.1em] text-faint uppercase">
+                  {overwrite ? "Will be replaced" : "Will be filled in"}
+                </span>
+                {willChange.map((c) => (
+                  <ChangeRow key={c.key} change={c} />
+                ))}
               </div>
-            </div>
+            )}
+
+            {skipped.length > 0 && (
+              <div className="flex flex-col gap-2 rounded-md border border-border-soft p-3">
+                <span className="font-mono text-[9.5px] tracking-[0.1em] text-faint uppercase">
+                  Left alone — already written
+                </span>
+                {skipped.map((c) => (
+                  <ChangeRow key={c.key} change={c} muted />
+                ))}
+              </div>
+            )}
+
+            {willChange.length === 0 && skipped.length === 0 && (
+              <p className="m-0 text-[12.5px] leading-[1.55] text-muted">
+                Nothing in these notes maps onto a field on the page. They've still got a company
+                or a contact in them — save them as a source and they'll be there when generation
+                is wired up.
+              </p>
+            )}
+
+            {occupied.length > 0 && (
+              <label className="flex cursor-pointer items-start gap-2 text-[12.5px] leading-[1.5] text-body">
+                <input
+                  type="checkbox"
+                  checked={overwrite}
+                  onChange={(e) => {
+                    setOverwrite(e.target.checked);
+                    setApplied(null);
+                  }}
+                  className="mt-0.5 cursor-pointer accent-blue"
+                />
+                <span>
+                  Let the notes win — replace the {occupied.length} field
+                  {occupied.length === 1 ? "" : "s"} already written.
+                  <span className="block text-[11.5px] text-muted">
+                    A pre-call room is pre-written on purpose, so on one of those this replaces the
+                    archetype's figures with theirs.
+                  </span>
+                </span>
+              </label>
+            )}
 
             <div className="flex items-center gap-3">
-              <Button variant="primary" onClick={applyAll}>
-                Fill the room from these notes
+              <Button variant="primary" onClick={applyAll} disabled={willChange.length === 0}>
+                {overwrite && occupied.length
+                  ? `Apply all ${willChange.length} changes`
+                  : `Fill ${willChange.length} field${willChange.length === 1 ? "" : "s"}`}
               </Button>
               <Button onClick={keepAsSource}>Just save as a source</Button>
             </div>
 
-            {applied && applied.length > 0 && (
-              <p className="m-0 flex items-center gap-1.5 text-[12px] font-bold text-green">
-                <CheckIcon size={12} />
-                Filled: {applied.join(", ")}. Anything you'd already written was left as it was.
+            {stranded.length > 0 && (
+              <p className="m-0 rounded-md bg-red/10 px-3 py-2 text-[12px] leading-[1.5] text-red">
+                {stranded.map((s) => `"${s.value}${s.unit ? ` ${s.unit}` : ""} · ${s.label}"`).join(", ")}{" "}
+                {stranded.length === 1 ? "isn't" : "aren't"} from these notes and will stay put —
+                but the figures line will start crediting them. Replace or clear{" "}
+                {stranded.length === 1 ? "it" : "them"} in Business case before you send.
               </p>
             )}
 
-            {/* Silence after a click reads as a broken button. */}
-            {applied?.length === 0 && (
-              <p className="m-0 text-[12px] leading-[1.5] text-muted">
-                Nothing to fill — every field these notes cover already had something in it, so
-                they've been kept as a source instead. Clear a field and run this again to
-                replace it.
+            <p className="m-0 text-[11.5px] leading-[1.5] text-faint">
+              The headline and the framing lines are never written from notes — those are a
+              judgement call, and they're what the Claude wiring is for.
+            </p>
+
+            {applied && applied.length > 0 && (
+              <p className="m-0 flex items-center gap-1.5 text-[12px] font-bold text-green">
+                <CheckIcon size={12} />
+                Done: {[...new Set(applied)].join(", ")}.
               </p>
             )}
           </>
@@ -255,11 +381,22 @@ export function NotesImport() {
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** One "Stat 2: 6 portals → 40 producers" line. */
+function ChangeRow({ change, muted }: { change: Change; muted?: boolean }) {
   return (
     <div className="grid grid-cols-[92px_minmax(0,1fr)] items-start gap-2">
-      <span className="font-mono text-[9.5px] tracking-[0.08em] text-faint uppercase">{label}</span>
-      <span className="min-w-0">{children}</span>
+      <span className="font-mono text-[9.5px] tracking-[0.08em] text-faint uppercase">
+        {change.label}
+      </span>
+      <span className={`min-w-0 text-[12.5px] leading-[1.5] ${muted ? "text-muted" : "text-body"}`}>
+        {change.current && (
+          <>
+            <span className="text-faint line-through">{change.current}</span>
+            <span className="text-faint"> → </span>
+          </>
+        )}
+        <span className={muted ? "" : "font-bold text-navy"}>{change.next}</span>
+      </span>
     </div>
   );
 }
