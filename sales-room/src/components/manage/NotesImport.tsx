@@ -1,13 +1,18 @@
 import { useMemo, useState } from "react";
 import { useRooms } from "../../context/RoomsContext";
-import { isEmptyParse, parseNotes, type ParsedNotes } from "../../lib/granola";
+import { isEmptyParse, parseNotes, RULE, type ParsedNotes } from "../../lib/granola";
 import { CheckIcon } from "../icons";
 import { Button, Section } from "./Field";
 
 /** Placeholder text from a fresh room — safe to fill over. */
 const PLACEHOLDER = /^(—|-|\[.*\]|Headline goes here\.|Describe what changes for them\.|Metric (one|two|three|four)|(First|Second|Third) (proof point|milestone)|What happens|Source pending|Add the assumptions.*|Prepared by 1Fort|REF-0000|Untitled room)$/i;
 
-const isBlank = (v: string) => !v.trim() || PLACEHOLDER.test(v.trim());
+/**
+ * Blank, placeholder, or debris. RULE is in there so a room an earlier import
+ * filled with a row of equals signs can be repaired by pasting again, instead
+ * of the junk counting as content the rep wrote and being protected.
+ */
+const isBlank = (v: string) => !v.trim() || PLACEHOLDER.test(v.trim()) || RULE.test(v);
 
 /**
  * The line the figure came from, with the figure itself taken out — the number
@@ -38,18 +43,34 @@ function statLabel(n: { value: string; unit?: string; context: string }): string
  * as a source either way, so a later regeneration has the original.
  */
 export function NotesImport() {
-  const { activeRoom, updateRoom, setField, setListItem } = useRooms();
+  const { activeRoom, updateRoom, setField, setListItem, renameSource } = useRooms();
   const { content, account } = activeRoom;
   const [text, setText] = useState("");
-  const [applied, setApplied] = useState<string[]>([]);
+  /** null until the rep runs it; an empty array means "nothing was blank". */
+  const [applied, setApplied] = useState<string[] | null>(null);
 
   const parsed: ParsedNotes | null = useMemo(
     () => (text.trim().length > 20 ? parseNotes(text) : null),
     [text],
   );
 
-  // Whoever isn't us is the counterparty.
-  const them = parsed?.people.filter((p) => !/1fort/i.test(p.title ?? "")) ?? [];
+  /**
+   * Whoever isn't us is the counterparty — and when the notes name both sides,
+   * whoever is at the company the room is for. Without that second test the
+   * first person listed wins, which on a two-vendor call is our own AE.
+   */
+  const them = useMemo(() => {
+    const everyone = parsed?.people ?? [];
+    const notUs = everyone.filter((p) => !/1fort/i.test(`${p.org ?? ""} ${p.title ?? ""}`));
+    const company = parsed?.company?.toLowerCase() ?? "";
+    const atCompany = company
+      ? notUs.filter((p) => {
+          const org = p.org?.toLowerCase();
+          return org && (company.includes(org) || org.includes(company));
+        })
+      : [];
+    return atCompany.length ? atCompany : notUs;
+  }, [parsed]);
 
   function applyAll() {
     if (!parsed) return;
@@ -121,7 +142,13 @@ export function NotesImport() {
   /** Keeps the notes on the room so a later regeneration can draw on them. */
   function keepAsSource() {
     const label = parsed?.title?.slice(0, 60) || "Pasted notes";
-    if (activeRoom.sources.some((s) => s.text === parsed?.raw)) return;
+    const existing = activeRoom.sources.find((s) => s.text === parsed?.raw);
+    if (existing) {
+      // Same notes, better label — an earlier import may have named this source
+      // after a divider line.
+      if (existing.label !== label) renameSource(existing.id, label);
+      return;
+    }
     updateRoom(activeRoom.id, {
       sources: [
         ...activeRoom.sources,
@@ -142,7 +169,7 @@ export function NotesImport() {
           value={text}
           onChange={(e) => {
             setText(e.target.value);
-            setApplied([]);
+            setApplied(null);
           }}
           rows={10}
           placeholder={`Meridian Risk Partners <> 1Fort — Discovery Call\nJul 24, 2026\n\nAttendees: Dana Whitfield (COO), Rachel Moss (1Fort)\n\nSummary\n- 40 producers submitting cyber via email and spreadsheets\n- Median time to first quote is 11.5 days\n- $1.4M of unwritten premium annually\n\nNext steps\n- Pilot with two producers`}
@@ -162,7 +189,9 @@ export function NotesImport() {
                 {them.length > 0 && (
                   <Row label="Contact">
                     {them[0].name}
-                    {them[0].title && <span className="text-muted"> · {them[0].title}</span>}
+                    {(them[0].title ?? them[0].org) && (
+                      <span className="text-muted"> · {them[0].title ?? them[0].org}</span>
+                    )}
                   </Row>
                 )}
                 {parsed.numbers.length > 0 && (
@@ -197,10 +226,19 @@ export function NotesImport() {
               <Button onClick={keepAsSource}>Just save as a source</Button>
             </div>
 
-            {applied.length > 0 && (
+            {applied && applied.length > 0 && (
               <p className="m-0 flex items-center gap-1.5 text-[12px] font-bold text-green">
                 <CheckIcon size={12} />
                 Filled: {applied.join(", ")}. Anything you'd already written was left as it was.
+              </p>
+            )}
+
+            {/* Silence after a click reads as a broken button. */}
+            {applied?.length === 0 && (
+              <p className="m-0 text-[12px] leading-[1.5] text-muted">
+                Nothing to fill — every field these notes cover already had something in it, so
+                they've been kept as a source instead. Clear a field and run this again to
+                replace it.
               </p>
             )}
           </>
