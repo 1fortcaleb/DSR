@@ -363,12 +363,11 @@ export function SourcesEditor() {
           {status === "working" ? "Regenerating…" : "Regenerate 1-pager"}
         </Button>
       </div>
-      {!isLive && (
-        <p className="m-0 text-[10.5px] leading-[1.45] text-faint">
-          AI generation is disconnected — regenerate rebuilds the draft from the selected sources
-          locally.
-        </p>
-      )}
+      <p className="m-0 text-[10.5px] leading-[1.45] text-faint">
+        {isLive
+          ? "Claude writes the page from the sources switched on above. It won't put a figure on the page that the sources don't state — a slot left empty is a number worth going and finding."
+          : "AI generation is disconnected — regenerate rebuilds the draft from the selected sources locally."}
+      </p>
     </Section>
   );
 }

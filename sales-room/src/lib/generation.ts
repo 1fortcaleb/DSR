@@ -1,7 +1,12 @@
-import type { CaseContent, GeneratedSource } from "../types";
+import { mergeCase } from "./caseMerge";
+import { supabase } from "./supabase";
+import type { CaseContent, GeneratedSource, Room } from "../types";
 
 export interface GenerateRequest {
   account: string;
+  kind: Room["kind"];
+  mode: Room["mode"];
+  owner: string;
   current: CaseContent;
   sources: GeneratedSource[];
 }
@@ -16,113 +21,72 @@ export interface GenerationProvider {
 /** Thrown for problems the rep can fix (e.g. no sources selected). */
 export class GenerationError extends Error {}
 
-const MOCK_LATENCY_MS = 1400;
-
-const UNKNOWN = "—";
+// Netlify reserves /.netlify/functions/*, so the SPA catch-all redirect in
+// netlify.toml cannot shadow it. A prettier /api/* path can be.
+const ROUTE = "/.netlify/functions/generate-case";
 
 /**
- * Stand-in for the model call. It is deliberately source-driven rather than
- * random: toggling a source off removes the figures that source underwrites,
- * so the wiring is demonstrable without inventing numbers we can't support.
+ * Calls Claude through a backend route.
+ *
+ * The route, not this file, holds the API key — a key bundled into the browser
+ * is readable by anyone who opens devtools, and a key on a public site is a key
+ * someone else is spending. This side only assembles the request and carries
+ * the rep's session token so the route can tell a colleague from a stranger.
+ *
+ * Everything the model sees comes from sources the rep has switched on. Toggle
+ * one off and the next regeneration cannot draw on it.
  */
-async function mockGenerate({ current, sources }: GenerateRequest): Promise<CaseContent> {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
-
-  const used = new Set(sources.filter((s) => s.used).map((s) => s.id));
-  if (used.size === 0) {
-    throw new GenerationError("Select at least one source before regenerating.");
+async function generateViaBackend(request: GenerateRequest): Promise<CaseContent> {
+  const used = request.sources.filter((s) => s.used && s.text?.trim());
+  if (!used.length) {
+    throw new GenerationError(
+      "Nothing to write from. Paste the call notes under Paste notes, then try again.",
+    );
   }
 
-  const hasProduction = used.has("production-report");
-  const hasRoiModel = used.has("roi-model");
-  const hasDiscovery = used.has("discovery-call");
-  const hasAppetite = used.has("appetite-notes");
+  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+  const token = data.session?.access_token;
+  if (!token) throw new GenerationError("Sign in again — your session has expired.");
 
-  const stats = current.stats.map((stat) => {
-    switch (stat.id) {
-      case "days":
-        return { ...stat, value: hasProduction ? "11.5" : UNKNOWN };
-      case "never-quoted":
-        return { ...stat, value: hasProduction ? "38" : UNKNOWN };
-      case "unwritten":
-        return { ...stat, value: hasProduction ? "$1.4M" : UNKNOWN };
-      default:
-        return stat;
-    }
-  });
+  let res: Response;
+  try {
+    res = await fetch(ROUTE, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        account: request.account,
+        kind: request.kind,
+        mode: request.mode,
+        owner: request.owner,
+        current: request.current,
+        sources: used.map((s) => ({ label: s.label, text: s.text })),
+      }),
+    });
+  } catch {
+    // Running `npm run dev` serves the app but not the function. `netlify dev`
+    // serves both, which is the difference the message needs to name.
+    throw new GenerationError(
+      "Couldn't reach the generation service. On a local build, run `netlify dev` instead of `npm run dev`.",
+    );
+  }
 
-  const yearOneRows = current.yearOneRows.map((row) => {
-    switch (row.id) {
-      case "hours":
-        return { ...row, value: hasRoiModel ? "4,800" : UNKNOWN };
-      case "payback":
-        return { ...row, value: hasRoiModel ? "3.2 months" : "Not modeled" };
-      default:
-        return row;
-    }
-  });
+  if (res.status === 404) {
+    throw new GenerationError(
+      "The generation route isn't deployed. On a local build, run `netlify dev` instead of `npm run dev`.",
+    );
+  }
 
-  const framing = current.framing.map((line) => {
-    if (line.id === "cost") {
-      return {
-        ...line,
-        value: hasProduction ? "[$1.4M of unwritten premium]" : "[unquantified premium leakage]",
-      };
-    }
-    if (line.id === "means") {
-      return { ...line, value: hasDiscovery ? "[your 40 producers]" : "[your producers]" };
-    }
-    return line;
-  });
+  const payload = (await res.json().catch(() => null)) as
+    | { content?: CaseContent; error?: string }
+    | null;
+  if (!res.ok) throw new GenerationError(payload?.error ?? `Generation failed (${res.status}).`);
+  if (!payload?.content) throw new GenerationError("The service returned nothing usable.");
 
-  const appetiteBullet = {
-    id: "b-appetite",
-    text: "Placement routed to in-appetite markets before the submission goes out",
-  };
-  const changesBullets = current.changesBullets.filter((b) => b.id !== appetiteBullet.id);
-
-  return {
-    ...current,
-    headline: hasProduction
-      ? "Take 11 days out of every submission at Meridian."
-      : "Cut quote turnaround at Meridian.",
-    framing,
-    stats,
-    statsSource: hasProduction
-      ? "From Meridian's 2025 production report"
-      : "Baseline pending — production report not included",
-    changesBullets: hasAppetite ? [...changesBullets, appetiteBullet] : changesBullets,
-    yearOneValue: hasRoiModel ? "$2.1M" : UNKNOWN,
-    yearOneRows,
-    yearOneFootnote: hasRoiModel
-      ? current.yearOneFootnote
-      : "Add the ROI model as a source to populate year-one figures.",
-  };
+  return mergeCase(request.current, payload.content);
 }
 
-const MOCK_PROVIDER: GenerationProvider = {
-  id: "mock",
-  live: false,
-  generate: mockGenerate,
-};
-
-/**
- * Placeholder for the real generation call.
- *
- * The API key must never reach the browser, so this cannot call Anthropic
- * directly from client code — it needs to POST to a backend route that holds
- * the key server-side and calls Claude (`claude-opus-5`) there, returning a
- * `CaseContent` payload. Nothing here is wired up yet by design.
- */
-const LIVE_PROVIDER: GenerationProvider = {
-  id: "live",
+export const generationProvider: GenerationProvider = {
+  id: "claude",
   live: true,
-  async generate() {
-    throw new GenerationError("Live generation is not connected yet.");
-  },
+  generate: generateViaBackend,
 };
-
-void LIVE_PROVIDER;
-
-/** Swap to LIVE_PROVIDER once the backend generation route exists. */
-export const generationProvider: GenerationProvider = MOCK_PROVIDER;

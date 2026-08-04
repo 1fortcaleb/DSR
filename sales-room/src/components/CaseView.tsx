@@ -411,12 +411,11 @@ export function CaseView({ audience }: CaseViewProps) {
               {status === "working" ? "Regenerating…" : "Regenerate 1-pager"}
             </button>
 
-            {!isLive && (
-              <p className="m-0 text-[10px] leading-[1.45] text-faint">
-                AI generation is disconnected — regenerate rebuilds the draft from the selected
-                sources locally.
-              </p>
-            )}
+            <p className="m-0 text-[10px] leading-[1.45] text-faint">
+              {isLive
+                ? "Written by Claude from the sources switched on. Figures come from the notes or not at all."
+                : "AI generation is disconnected — regenerate rebuilds the draft from the selected sources locally."}
+            </p>
           </div>
 
           <ResponsesPanel />

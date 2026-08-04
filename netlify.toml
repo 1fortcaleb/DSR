@@ -4,6 +4,9 @@
   command = "npm run build"
   publish = "dist"
 
+[functions]
+  directory = "netlify/functions"
+
 # Every /r/<token> is a client-side route with no file behind it. Without this
 # a recipient opening a share link gets a 404 from the CDN, not the room.
 [[redirects]]

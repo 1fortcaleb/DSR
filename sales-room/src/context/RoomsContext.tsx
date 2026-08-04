@@ -306,7 +306,14 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     generationProvider
-      .generate({ account: room.account.company, current: room.content, sources: room.sources })
+      .generate({
+        account: room.account.company,
+        kind: room.kind,
+        mode: room.mode,
+        owner: room.account.owner.name,
+        current: room.content,
+        sources: room.sources,
+      })
       .then((next) => {
         if (runId !== runIdRef.current) return;
         patchRoom(room.id, { content: next });
