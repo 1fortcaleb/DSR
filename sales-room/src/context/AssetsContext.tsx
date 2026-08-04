@@ -26,7 +26,7 @@ import { isCloud } from "../lib/supabase";
 import { kindOf, makeThumbnail } from "../lib/thumbnails";
 import type { Asset, AssetKind } from "../types";
 
-interface AssetsContextValue {
+export interface AssetsContextValue {
   assets: Asset[];
   byId: Map<string, Asset>;
   loading: boolean;
@@ -36,6 +36,8 @@ interface AssetsContextValue {
   generationLive: boolean;
 
   upload: (files: FileList | File[]) => Promise<void>;
+  /** Adds one file and hands back the stored asset, for callers that need its id. */
+  addFile: (file: File) => Promise<Asset>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<void>;
   generate: (prompt: string, kind: AssetKind, account: string) => Promise<void>;
@@ -44,7 +46,13 @@ interface AssetsContextValue {
   dismissError: () => void;
 }
 
-const AssetsContext = createContext<AssetsContextValue | null>(null);
+/**
+ * Exported so the shared view can supply the same shape from a share payload.
+ * The counterparty has no library and no write access — only the handful of
+ * assets their room actually references, already resolved to hosted URLs.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const AssetsContext = createContext<AssetsContextValue | null>(null);
 
 function newId(): string {
   // Must be a UUID: this becomes the assets primary key in Postgres, and it is
@@ -93,6 +101,7 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     // it. Local: IndexedDB, which only this browser can see.
     const saved = isCloud ? await putCloudAsset(asset, file) : (await putAsset(asset, file), asset);
     setAssets((prev) => [saved, ...prev]);
+    return saved;
   }, []);
 
   const upload = useCallback(
@@ -166,6 +175,18 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
 
   const byId = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
 
+  const addFile = useCallback(
+    async (file: File) => {
+      setUploading((n) => n + 1);
+      try {
+        return await ingest(file, "uploaded");
+      } finally {
+        setUploading((n) => Math.max(0, n - 1));
+      }
+    },
+    [ingest],
+  );
+
   const value: AssetsContextValue = {
     assets,
     byId,
@@ -174,6 +195,7 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     error,
     generationLive: assetGenerationProvider.live,
     upload,
+    addFile,
     remove,
     rename,
     generate,

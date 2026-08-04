@@ -174,6 +174,7 @@ language plpgsql security definer set search_path = public as $$
 declare
   v_link public.share_links;
   v_room public.rooms;
+  v_videos jsonb;
   v_asset_ids text[];
 begin
   v_link := public.resolve_share(p_token);
@@ -189,13 +190,22 @@ begin
          first_opened_at = coalesce(first_opened_at, now())
    where token = p_token;
 
+  -- Curation is enforced here, not in the client. A video the rep pulled out of
+  -- the room must not travel in the payload at all: its title and its asset URL
+  -- would both be readable by anyone opening the link.
+  select coalesce(jsonb_agg(v), '[]'::jsonb) into v_videos
+    from jsonb_array_elements(coalesce(v_room.videos, '[]'::jsonb)) v
+   where v ->> 'id' in (
+     select jsonb_array_elements_text(coalesce(v_room.curated_video_ids, '[]'::jsonb))
+   );
+
   -- Only the assets this room actually references are exposed.
   select array_agg(distinct x) into v_asset_ids from (
     select jsonb_array_elements(v_room.documents) ->> 'assetId' as x
     union all
-    select jsonb_array_elements(v_room.videos) ->> 'posterAssetId'
+    select jsonb_array_elements(v_videos) ->> 'posterAssetId'
     union all
-    select jsonb_array_elements(v_room.videos) ->> 'videoAssetId'
+    select jsonb_array_elements(v_videos) ->> 'videoAssetId'
   ) s where x is not null;
 
   return jsonb_build_object(
@@ -205,7 +215,7 @@ begin
     'account',         v_room.account,
     'content',         v_room.content,
     'documents',       v_room.documents,
-    'videos',          v_room.videos,
+    'videos',          v_videos,
     'curatedVideoIds', v_room.curated_video_ids,
     'recipientName',   v_link.recipient_name,
     'feedback', (

@@ -3,6 +3,7 @@ import type { Audience } from "../types";
 import { useRooms } from "../context/RoomsContext";
 import { useAssets } from "../context/AssetsContext";
 import { ImagePlaceholder } from "./ImagePlaceholder";
+import { RecordAnswer } from "./RecordAnswer";
 import { VideoPlayer } from "./VideoPlayer";
 import { PlusIcon, RecordIcon, XIcon } from "./icons";
 
@@ -18,6 +19,7 @@ export function VideosView({ audience }: VideosViewProps) {
   const curatedIds = activeRoom.curatedVideoIds;
   const setCuratedIds = (next: string[]) => updateRoom(activeRoom.id, { curatedVideoIds: next });
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
 
   const curated = curatedIds.map((id) => allVideos.find((v) => v.id === id)).filter((v) => v !== undefined);
   const library = activeRoom.library.filter((v) => !curatedIds.includes(v.id));
@@ -49,7 +51,10 @@ export function VideosView({ audience }: VideosViewProps) {
           </p>
         </div>
         {isRep && (
-          <button className="inline-flex flex-none cursor-pointer items-center gap-2 rounded-[5px] border-none bg-blue px-[15px] py-[11px] font-sans text-[12.5px] font-bold text-white transition-all hover:bg-blue-hover active:translate-y-px">
+          <button
+            onClick={() => setRecording(true)}
+            className="inline-flex flex-none cursor-pointer items-center gap-2 rounded-[5px] border-none bg-blue px-[15px] py-[11px] font-sans text-[12.5px] font-bold text-white transition-all hover:bg-blue-hover active:translate-y-px"
+          >
             <RecordIcon />
             Record a new answer
           </button>
@@ -59,7 +64,7 @@ export function VideosView({ audience }: VideosViewProps) {
       {!hasAny && (
         <p className="m-0 text-[13px] text-muted">
           {isRep
-            ? "No videos in this room yet. Add them from Manage content."
+            ? "No videos in this room yet. Record one above, or paste a Loom or Vidyard link from Manage content."
             : "No video answers have been shared here yet."}
         </p>
       )}
@@ -80,6 +85,8 @@ export function VideosView({ audience }: VideosViewProps) {
             <span className="text-xs text-muted">{video?.by}</span>
           </div>
 
+          {/* A recorded answer has no chapters; a bare heading over nothing reads as broken. */}
+          {(video?.chapters.length ?? 0) > 0 && (
           <div className="flex flex-col gap-2.5">
             <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">Chapters</span>
             <div className="flex flex-col">
@@ -94,6 +101,7 @@ export function VideosView({ audience }: VideosViewProps) {
               ))}
             </div>
           </div>
+          )}
 
           {isRep && video && (
             <div className="mt-auto flex flex-col gap-2.5 rounded-lg bg-row-hover p-4">
@@ -101,7 +109,7 @@ export function VideosView({ audience }: VideosViewProps) {
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#666782] uppercase">
                   Watch-through
                 </span>
-                <span className="text-[11.5px] text-body">{video.watched}</span>
+                <span className="text-[11.5px] text-body">{video.watched || "Not watched yet"}</span>
               </div>
               <div className="h-1 rounded-full bg-gray-100">
                 <div
@@ -109,7 +117,7 @@ export function VideosView({ audience }: VideosViewProps) {
                   style={{ width: `${video.pct}%` }}
                 />
               </div>
-              <p className="m-0 text-[11px] leading-[1.5] italic text-muted">{video.note}</p>
+              {video.note && <p className="m-0 text-[11px] leading-[1.5] italic text-muted">{video.note}</p>}
             </div>
           )}
         </div>
@@ -168,7 +176,7 @@ export function VideosView({ audience }: VideosViewProps) {
                       />
                     </div>
                     <span className={`text-[10.5px] ${tile.pct > 0 ? "text-green" : "text-faint"}`}>
-                      {tile.watched}
+                      {tile.watched || `${tile.by} · ${tile.dur}`}
                     </span>
                   </>
                 ) : (
@@ -220,6 +228,8 @@ export function VideosView({ audience }: VideosViewProps) {
           </div>
         </section>
       )}
+
+      {recording && <RecordAnswer onClose={() => setRecording(false)} />}
     </div>
   );
 }

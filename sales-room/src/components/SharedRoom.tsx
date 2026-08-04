@@ -8,11 +8,16 @@ import {
   type SharedRoomPayload,
 } from "../lib/api";
 import { RoomsContext, type RoomsContextValue } from "../context/RoomsContext";
+import { AssetsContext, type AssetsContextValue } from "../context/AssetsContext";
 import { isCloud } from "../lib/supabase";
 import { vocabularyFor } from "../lib/vocabulary";
-import type { FlaggedPassage, Room, Verdict } from "../types";
+import type { Asset, AssetKind, FlaggedPassage, Room, Verdict } from "../types";
 import { CaseView } from "./CaseView";
+import { FilesView } from "./FilesView";
+import { VideosView } from "./VideosView";
 import wordmark from "../assets/wordmark-1fort-dark.png";
+
+type SharedTab = "case" | "files" | "videos";
 
 /**
  * What the counterparty gets when they open a share link. No account, no rep
@@ -26,6 +31,7 @@ export function SharedRoom({ token }: { token: string }) {
   const [payload, setPayload] = useState<SharedRoomPayload | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "gone" | "error" | "unconfigured">("loading");
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<SharedTab>("case");
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -150,6 +156,43 @@ export function SharedRoom({ token }: { token: string }) {
     };
   }, [payload, submitFeedback, withdrawFeedback, flagPassage]);
 
+  /* The counterparty's asset context: read-only, and only the assets their own
+     room references. Every one already carries a hosted URL, so nothing here
+     ever touches IndexedDB or the rep-side library. */
+  const assetsValue: AssetsContextValue = useMemo(() => {
+    const assets: Asset[] = (payload?.assets ?? []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      kind: a.kind as AssetKind,
+      mimeType: "",
+      sizeBytes: 0,
+      thumbnail: a.thumbnail,
+      url: a.url,
+      origin: "uploaded",
+      createdAt: "",
+    }));
+    const byId = new Map(assets.map((a) => [a.id, a]));
+    const denied = async () => {
+      throw new Error("Read-only.");
+    };
+    return {
+      assets,
+      byId,
+      loading: false,
+      uploading: 0,
+      error: null,
+      generationLive: false,
+      upload: denied,
+      addFile: denied,
+      remove: denied,
+      rename: denied,
+      generate: denied,
+      openUrl: async (id: string) => byId.get(id)?.url ?? null,
+      clearAll: denied,
+      dismissError: () => undefined,
+    };
+  }, [payload?.assets]);
+
   if (state === "loading") {
     return <Shell><p className="m-0 text-[13px] text-muted">Opening…</p></Shell>;
   }
@@ -193,29 +236,67 @@ export function SharedRoom({ token }: { token: string }) {
     );
   }
 
+  // Tabs only appear for content that exists. A room sent as a bare one-pager
+  // shouldn't grow empty sections to click on.
+  const docCount = value.activeRoom.documents.length;
+  const videoCount = value.activeRoom.curatedVideoIds.length;
+  const tabs: { id: SharedTab; label: string; count?: number }[] = [
+    { id: "case", label: "Business case" },
+    ...(docCount ? [{ id: "files" as const, label: "Documents", count: docCount }] : []),
+    ...(videoCount ? [{ id: "videos" as const, label: "Video answers", count: videoCount }] : []),
+  ];
+  const active: SharedTab = tabs.some((t) => t.id === tab) ? tab : "case";
+
   return (
     <RoomsContext.Provider value={value}>
-      <div className="min-h-screen bg-panel">
-        <header className="flex items-center gap-3 bg-nav px-8 py-3.5">
-          <img src={wordmark} alt="1Fort AI" className="h-[13px] w-auto" />
-          <span className="border-l border-nav-line pl-3 font-mono text-[10px] tracking-[0.1em] text-nav-faint uppercase">
-            {value.vocabulary.roomNoun}
-          </span>
-          <span className="ml-auto text-[12.5px] text-nav-body">
-            {payload?.account.company}
-          </span>
-        </header>
+      <AssetsContext.Provider value={assetsValue}>
+        <div className="min-h-screen bg-panel">
+          <header className="flex items-center gap-3 bg-nav px-8 py-3.5">
+            <img src={wordmark} alt="1Fort AI" className="h-[13px] w-auto" />
+            <span className="border-l border-nav-line pl-3 font-mono text-[10px] tracking-[0.1em] text-nav-faint uppercase">
+              {value.vocabulary.roomNoun}
+            </span>
+            <span className="ml-auto text-[12.5px] text-nav-body">
+              {payload?.account.company}
+            </span>
+          </header>
 
-        {error && (
-          <p className="m-0 bg-red/10 px-8 py-2 text-[12px] text-red">
-            {error} Your answer may not have been saved.
-          </p>
-        )}
+          {tabs.length > 1 && (
+            <nav className="flex items-center gap-1 border-b border-border bg-white px-8">
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`cursor-pointer border-none border-b-2 bg-transparent px-3 py-3.5 font-sans text-[12.5px] font-bold transition-colors ${
+                    active === t.id
+                      ? "border-b-blue text-navy"
+                      : "border-b-transparent text-muted hover:text-navy"
+                  }`}
+                >
+                  {t.label}
+                  {t.count !== undefined && (
+                    <span className="ml-1.5 font-mono text-[10.5px] font-normal text-faint">
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          )}
 
-        <main className="min-w-[1100px]">
-          <CaseView audience="buyer" />
-        </main>
-      </div>
+          {error && (
+            <p className="m-0 bg-red/10 px-8 py-2 text-[12px] text-red">
+              {error} Your answer may not have been saved.
+            </p>
+          )}
+
+          <main className="min-w-[1100px]">
+            {active === "case" && <CaseView audience="buyer" />}
+            {active === "files" && <FilesView audience="buyer" />}
+            {active === "videos" && <VideosView audience="buyer" />}
+          </main>
+        </div>
+      </AssetsContext.Provider>
     </RoomsContext.Provider>
   );
 }
