@@ -16,6 +16,15 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+/**
+ * Mirrors the enforce_signup_domain trigger in supabase/schema.sql.
+ *
+ * The trigger is the enforcement — this list is only here so a colleague who
+ * types their personal address gets a sentence explaining why, instead of the
+ * database's own failure. Anyone editing one must edit the other.
+ */
+const TEAM_DOMAINS = ["1fort.ai", "1fort.com"];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isCloud);
@@ -42,8 +51,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signUp(email, password) {
       if (!supabase) throw new Error("Supabase isn't configured.");
+      const domain = email.trim().toLowerCase().split("@")[1] ?? "";
+      if (!TEAM_DOMAINS.includes(domain)) {
+        throw new Error(`Use your work address — ${TEAM_DOMAINS.join(" or ")} only.`);
+      }
       const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
+      if (error) {
+        // A trigger that rejects an insert on auth.users can't get its own
+        // message out: the auth service reports its own wording instead, which
+        // reads as a broken app rather than a rule being applied.
+        if (/database error saving new user/i.test(error.message)) {
+          throw new Error(
+            "The database refused the account. Your address looks right, so this is likely setup: run supabase/schema.sql and try again.",
+          );
+        }
+        throw error;
+      }
       // With email confirmation on, there's no session until they click the
       // link — say so rather than leaving them on a form that looks stuck.
       return data.session ? null : "Check your email to confirm the account, then sign in.";
