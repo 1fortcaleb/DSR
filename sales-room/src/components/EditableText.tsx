@@ -24,6 +24,15 @@ interface EditableTextProps {
   multiline?: boolean;
   /** Renders inert plain text — used for the buyer view, which can't edit. */
   readOnly?: boolean;
+  /**
+   * Shown instead of an unfilled value, to the rep only.
+   *
+   * A slot the template left as "—" is a slot nobody has filled in, and a lone
+   * em-dash does not read as something you can click. The counterparty still
+   * sees the dash: a hint like "Today?" is an instruction to the rep, not a
+   * statement about the deal.
+   */
+  placeholder?: string;
   ariaLabel?: string;
 }
 
@@ -45,8 +54,11 @@ export function EditableText({
   inline = false,
   multiline = false,
   readOnly = false,
+  placeholder,
   ariaLabel,
 }: EditableTextProps) {
+  /** An em-dash is the templates' way of saying "not filled in yet". */
+  const unfilled = !value.trim() || value.trim() === "—";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   /**
@@ -62,8 +74,8 @@ export function EditableText({
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!editing) setDraft(value);
-  }, [value, editing]);
+    if (!editing) setDraft(unfilled ? "" : value);
+  }, [value, editing, unfilled]);
 
   useEffect(() => {
     if (!editing) return;
@@ -105,13 +117,15 @@ export function EditableText({
   }
 
   function commit() {
+    // Empty means "leave it as it was" — except on a slot that was never
+    // filled, where there is nothing to preserve and the dash should stay.
     const next = draft.trim() === "" ? value : draft;
     if (next !== value) onChange(next);
     setEditing(false);
   }
 
   function cancel() {
-    setDraft(value);
+    setDraft(unfilled ? "" : value);
     setEditing(false);
   }
 
@@ -180,7 +194,13 @@ export function EditableText({
       title="Click to edit"
       className={`${className} cursor-text rounded-sm px-1 -mx-1 transition-colors hover:bg-blue-bg focus-visible:bg-blue-bg`}
     >
-      {value}
+      {unfilled && placeholder ? (
+        <span className="font-normal text-faintest italic no-underline decoration-dotted underline-offset-4 [text-decoration-line:underline]">
+          {placeholder}
+        </span>
+      ) : (
+        value
+      )}
     </Tag>
   );
 }

@@ -242,7 +242,14 @@ export function CaseEditor() {
         />
         <div className="flex flex-col gap-2">
           {c.outcomes.map((o) => (
-            <ListRow key={o.id}>
+            <ListRow
+              key={o.id}
+              onRemove={
+                c.outcomes.length > 1
+                  ? () => setField("outcomes", c.outcomes.filter((x) => x.id !== o.id))
+                  : undefined
+              }
+            >
               <TextField
                 label="Outcome"
                 value={o.label}
@@ -263,6 +270,16 @@ export function CaseEditor() {
             </ListRow>
           ))}
         </div>
+        <Button
+          onClick={() =>
+            setField("outcomes", [
+              ...c.outcomes,
+              { id: `o-${Date.now().toString(36)}`, label: "", from: "—", to: "—" },
+            ])
+          }
+        >
+          Add an outcome
+        </Button>
         <TextField
           label="Footnote"
           value={c.outcomesFootnote}

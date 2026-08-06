@@ -146,6 +146,7 @@ export function CaseView({ audience }: CaseViewProps) {
                       }
                       inline
                       ariaLabel={`${stat.label} value`}
+                      placeholder="0"
                     />
                     {stat.unit && (
                       <span className="text-[15px] font-normal text-muted">
@@ -241,6 +242,7 @@ export function CaseView({ audience }: CaseViewProps) {
                           setListItem("outcomes", o.id, { label: v })
                         }
                         ariaLabel={`Outcome: ${o.label}`}
+                        placeholder="What moves?"
                         className="text-[12.5px] leading-[1.4] text-body"
                       />
                       <div className="flex items-baseline gap-2">
@@ -252,6 +254,7 @@ export function CaseView({ audience }: CaseViewProps) {
                           }
                           inline
                           ariaLabel={`${o.label} today`}
+                          placeholder="today?"
                           className="text-[13px] text-faint line-through"
                         />
                         <span className="text-[13px] text-faintest">
@@ -265,6 +268,7 @@ export function CaseView({ audience }: CaseViewProps) {
                           }
                           inline
                           ariaLabel={`${o.label} target`}
+                          placeholder="target?"
                           className="text-[15px] font-bold tracking-[-0.01em] text-green"
                         />
                       </div>
@@ -299,6 +303,7 @@ export function CaseView({ audience }: CaseViewProps) {
                       onChange={(v) => setField("investmentValue", v)}
                       inline
                       ariaLabel="Investment headline figure"
+                      placeholder="How much?"
                     />
                   </div>
                   <EditableText
@@ -334,6 +339,7 @@ export function CaseView({ audience }: CaseViewProps) {
                         }
                         inline
                         ariaLabel={`Row value: ${row.label}`}
+                        placeholder="?"
                         className={`text-[13px] font-bold ${
                           row.accent === "green"
                             ? "text-green"
