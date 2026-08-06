@@ -3,21 +3,39 @@ import { useRooms } from "../../context/RoomsContext";
 import { relativeTime } from "../../lib/vocabulary";
 import type { RoomKind } from "../../types";
 import { CaseView } from "../CaseView";
-import { ImageIcon, SlidersIcon, SparkleIcon } from "../icons";
+import { ImageIcon, SlidersIcon, SparkleIcon, UsersIcon } from "../icons";
 import { Button, SelectField, TextField } from "./Field";
-import { AccountEditor, CaseEditor, DocumentsEditor, SourcesEditor, VideosEditor } from "./editors";
+import {
+  AccountEditor,
+  CaseEditor,
+  DocumentsEditor,
+  SourcesEditor,
+  VideosEditor,
+} from "./editors";
 import { AssetsEditor } from "./AssetsEditor";
 import { ShareEditor } from "./ShareEditor";
 import { NotesImport } from "./NotesImport";
 import { PlaybookEditor } from "./PlaybookEditor";
+import { TeamEditor } from "./TeamEditor";
 import { useAuth } from "../../context/AuthContext";
 
-type SectionId = "notes" | "account" | "case" | "sources" | "documents" | "videos" | "share";
+type SectionId =
+  | "notes"
+  | "account"
+  | "case"
+  | "sources"
+  | "documents"
+  | "videos"
+  | "share";
 
 /** Per-room sections. The asset library is deliberately not one of these — it
  *  spans rooms, so filing it under a single room's name would be a lie. */
 const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
-  { id: "notes", label: "Paste notes", hint: "Start the room from a Granola note" },
+  {
+    id: "notes",
+    label: "Paste notes",
+    hint: "Start the room from a Granola note",
+  },
   { id: "account", label: "Room & account", hint: "Who this room is for" },
   { id: "case", label: "Business case", hint: "The 1-pager copy" },
   { id: "sources", label: "Sources", hint: "What it generates from" },
@@ -44,13 +62,17 @@ export function ManageView({ onExit }: { onExit: () => void }) {
   } = useRooms();
   // The rail picks a scope: one room's content, or one of the things that
   // span every room — the asset library and the playbook.
-  const [scope, setScope] = useState<"room" | "library" | "playbook">("room");
+  const [scope, setScope] = useState<"room" | "library" | "playbook" | "team">(
+    "room",
+  );
   // A new room opens on the paste step: it is the fastest way out of a blank
   // template, and the alternative is staring at "Headline goes here".
   const [section, setSection] = useState<SectionId>("notes");
   const [showPreview, setShowPreview] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [newKind, setNewKind] = useState<"deal" | "partnership" | "archetype">("deal");
+  const [newKind, setNewKind] = useState<"deal" | "partnership" | "archetype">(
+    "deal",
+  );
   const [newCompany, setNewCompany] = useState("");
 
   // The preview mirrors one room, so the library pane hands its width back.
@@ -59,7 +81,11 @@ export function ManageView({ onExit }: { onExit: () => void }) {
   function submitNewRoom() {
     if (!newCompany.trim()) return;
     const archetype = newKind === "archetype";
-    createRoom(archetype ? "deal" : (newKind as RoomKind), newCompany, archetype ? "archetype" : "specific");
+    createRoom(
+      archetype ? "deal" : (newKind as RoomKind),
+      newCompany,
+      archetype ? "archetype" : "specific",
+    );
     setNewCompany("");
     setCreating(false);
     setScope("room");
@@ -77,7 +103,9 @@ export function ManageView({ onExit }: { onExit: () => void }) {
             <span className="font-mono text-[10px] tracking-[0.12em] text-nav-faint uppercase">
               Rooms
             </span>
-            <span className="font-mono text-[10px] text-nav-faint">{rooms.length}</span>
+            <span className="font-mono text-[10px] text-nav-faint">
+              {rooms.length}
+            </span>
           </div>
           {rooms.map((room) => {
             const isActive = scope === "room" && room.id === activeRoomId;
@@ -120,7 +148,11 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                 label="Company"
                 value={newCompany}
                 onChange={setNewCompany}
-                placeholder={newKind === "archetype" ? "Mid-size retail brokers" : "Acme Brokers"}
+                placeholder={
+                  newKind === "archetype"
+                    ? "Mid-size retail brokers"
+                    : "Acme Brokers"
+                }
               />
               <SelectField<"deal" | "partnership" | "archetype">
                 label="Type"
@@ -133,7 +165,11 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                 onChange={setNewKind}
               />
               <div className="flex gap-1.5">
-                <Button variant="primary" onClick={submitNewRoom} disabled={!newCompany.trim()}>
+                <Button
+                  variant="primary"
+                  onClick={submitNewRoom}
+                  disabled={!newCompany.trim()}
+                >
                   Create
                 </Button>
                 <Button onClick={() => setCreating(false)}>Cancel</Button>
@@ -188,6 +224,23 @@ export function ManageView({ onExit }: { onExit: () => void }) {
               What good looks like
             </span>
           </button>
+          <button
+            onClick={() => setScope("team")}
+            className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors ${
+              scope === "team"
+                ? "border-periwinkle/40 bg-periwinkle/10"
+                : "border-transparent bg-transparent hover:bg-nav-raised"
+            }`}
+          >
+            <UsersIcon className="flex-none text-nav-faint" />
+            <span
+              className={`truncate text-[12.5px] ${
+                scope === "team" ? "font-bold text-nav-hi" : "text-nav-body"
+              }`}
+            >
+              Team access
+            </span>
+          </button>
         </div>
 
         <AccountFooter />
@@ -220,7 +273,9 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                 ? "Asset library"
                 : scope === "playbook"
                   ? "What good looks like"
-                  : activeRoom.name}
+                  : scope === "team"
+                    ? "Team access"
+                    : activeRoom.name}
             </span>
             {scope === "room" && (
               <span className="flex flex-none items-center gap-1.5 font-mono text-[9.5px] tracking-[0.08em] text-faint uppercase">
@@ -249,7 +304,9 @@ export function ManageView({ onExit }: { onExit: () => void }) {
 
         <div
           className={`grid min-h-0 flex-1 ${
-            previewOpen ? "grid-cols-[minmax(520px,1fr)_520px]" : "grid-cols-[minmax(0,1fr)]"
+            previewOpen
+              ? "grid-cols-[minmax(520px,1fr)_520px]"
+              : "grid-cols-[minmax(0,1fr)]"
           }`}
         >
           {/* Editor */}
@@ -281,6 +338,8 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                 <AssetsEditor />
               ) : scope === "playbook" ? (
                 <PlaybookEditor />
+              ) : scope === "team" ? (
+                <TeamEditor />
               ) : (
                 <>
                   {section === "account" && (
@@ -288,12 +347,18 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                       <AccountEditor />
                       {/* Room-scoped destructive actions belong with the room, not in the nav rail */}
                       <div className="flex items-center gap-2 rounded-[10px] border border-border bg-white p-4">
-                        <Button onClick={() => duplicateRoom(activeRoomId)}>Duplicate this room</Button>
+                        <Button onClick={() => duplicateRoom(activeRoomId)}>
+                          Duplicate this room
+                        </Button>
                         <Button
                           variant="danger"
                           onClick={() => deleteRoom(activeRoomId)}
                           disabled={rooms.length <= 1}
-                          title={rooms.length <= 1 ? "Can't delete the only room" : undefined}
+                          title={
+                            rooms.length <= 1
+                              ? "Can't delete the only room"
+                              : undefined
+                          }
                         >
                           Delete this room
                         </Button>
@@ -301,8 +366,11 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                           <Button
                             variant="primary"
                             onClick={() => {
-                              const company = window.prompt("Which account is this for?");
-                              if (company?.trim()) spinOffRoom(activeRoomId, company);
+                              const company = window.prompt(
+                                "Which account is this for?",
+                              );
+                              if (company?.trim())
+                                spinOffRoom(activeRoomId, company);
                             }}
                             title="Copies this page into a room for one account"
                           >
@@ -321,8 +389,8 @@ export function ManageView({ onExit }: { onExit: () => void }) {
                   {section === "sources" && <SourcesEditor />}
                   {section === "documents" && <DocumentsEditor />}
                   {section === "videos" && <VideosEditor />}
-                {section === "notes" && <NotesImport />}
-                {section === "share" && <ShareEditor />}
+                  {section === "notes" && <NotesImport />}
+                  {section === "share" && <ShareEditor />}
                 </>
               )}
             </div>
@@ -365,7 +433,9 @@ function AccountFooter() {
   if (!cloud) return null;
   return (
     <div className="mt-auto flex flex-col gap-1 border-t border-nav-line pt-3">
-      <span className="truncate px-2.5 font-mono text-[9.5px] text-nav-faint">{email}</span>
+      <span className="truncate px-2.5 font-mono text-[9.5px] text-nav-faint">
+        {email}
+      </span>
       <button
         onClick={() => void signOut()}
         className="w-full cursor-pointer rounded-md border-none bg-transparent px-2.5 py-1.5 text-left font-sans text-[11px] text-nav-body transition-colors hover:text-white"

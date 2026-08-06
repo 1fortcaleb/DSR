@@ -56,7 +56,10 @@ interface RoomsContextValue {
   deleteRoom: (id: string) => void;
 
   /** Replace one top-level field of the active room's case content. */
-  setField: <K extends keyof CaseContent>(key: K, value: CaseContent[K]) => void;
+  setField: <K extends keyof CaseContent>(
+    key: K,
+    value: CaseContent[K],
+  ) => void;
   /** Patch one item inside one of the content's arrays, matched by id. */
   setListItem: <K extends keyof CaseContent>(
     key: K,
@@ -103,20 +106,29 @@ const OWNER_FALLBACK = "Rachel Moss";
 export function RoomsProvider({ children }: { children: ReactNode }) {
   // In cloud mode the server is the source of truth, so we start empty rather
   // than flashing another account's locally cached rooms.
-  const [state, setState] = useState(() => (isCloud ? { activeRoomId: "", rooms: [] } : loadState()));
+  const [state, setState] = useState(() =>
+    isCloud ? { activeRoomId: "", rooms: [] } : loadState(),
+  );
   const [hydrated, setHydrated] = useState(!isCloud);
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const runIdRef = useRef(0);
   const hydratingRef = useRef(false);
 
+  // The ref, not a cleanup flag, is what keeps this to one fetch. An earlier
+  // version had both, and the pair deadlocked: StrictMode mounts, unmounts and
+  // remounts in development, so the first run started the fetch, the unmount
+  // marked it cancelled, and the remount saw the ref already set and never
+  // tried again — leaving "Loading rooms" on screen forever. Production builds
+  // don't double-invoke effects, which is why only local development hung.
+  //
+  // Landing state after an unmount is a no-op in React 18 and later, so there
+  // is nothing left for a cancelled flag to protect against.
   useEffect(() => {
     if (!isCloud || hydratingRef.current) return;
     hydratingRef.current = true;
-    let cancelled = false;
     void fetchRooms()
       .then(async (rooms) => {
-        if (cancelled) return;
         if (!rooms.length) {
           // A brand new account with no rooms would otherwise land on an empty
           // screen with nothing to click.
@@ -126,9 +138,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
           } catch (err) {
             // Report it rather than continuing with a room the server rejected:
             // it would look saved until the next reload lost it.
-            throw new Error(
-              `Couldn't create your first room. ${errText(err)}`,
-            );
+            throw new Error(`Couldn't create your first room. ${errText(err)}`);
           }
           rooms = [first];
         }
@@ -136,13 +146,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setHydrated(true);
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
         setError(errText(err));
         setHydrated(true);
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   // Local mode writes straight through. Cloud mode debounces so a burst of
@@ -156,15 +162,14 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     const room = state.rooms.find((r) => r.id === state.activeRoomId);
     if (!room) return;
     const t = setTimeout(() => {
-      void saveRoom(room).catch((err: unknown) =>
-        setError(errText(err)),
-      );
+      void saveRoom(room).catch((err: unknown) => setError(errText(err)));
     }, 700);
     return () => clearTimeout(t);
   }, [state, hydrated]);
 
   const activeRoom = useMemo(
-    () => state.rooms.find((r) => r.id === state.activeRoomId) ?? state.rooms[0],
+    () =>
+      state.rooms.find((r) => r.id === state.activeRoomId) ?? state.rooms[0],
     [state],
   );
 
@@ -175,7 +180,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({
       ...prev,
       rooms: prev.rooms.map((r) =>
-        r.id === id ? { ...r, ...patch, updatedAt: new Date().toISOString() } : r,
+        r.id === id
+          ? { ...r, ...patch, updatedAt: new Date().toISOString() }
+          : r,
       ),
     }));
   }, []);
@@ -186,7 +193,11 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         ...prev,
         rooms: prev.rooms.map((r) =>
           r.id === prev.activeRoomId
-            ? { ...r, content: updater(r.content), updatedAt: new Date().toISOString() }
+            ? {
+                ...r,
+                content: updater(r.content),
+                updatedAt: new Date().toISOString(),
+              }
             : r,
         ),
       }));
@@ -216,10 +227,14 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
   const toggleSource = useCallback(
     (id: string) => {
-      const room = stateRef.current.rooms.find((r) => r.id === stateRef.current.activeRoomId);
+      const room = stateRef.current.rooms.find(
+        (r) => r.id === stateRef.current.activeRoomId,
+      );
       if (!room) return;
       patchRoom(room.id, {
-        sources: room.sources.map((s) => (s.id === id ? { ...s, used: !s.used } : s)),
+        sources: room.sources.map((s) =>
+          s.id === id ? { ...s, used: !s.used } : s,
+        ),
       });
     },
     [patchRoom],
@@ -227,7 +242,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
   const renameSource = useCallback(
     (id: string, label: string) => {
-      const room = stateRef.current.rooms.find((r) => r.id === stateRef.current.activeRoomId);
+      const room = stateRef.current.rooms.find(
+        (r) => r.id === stateRef.current.activeRoomId,
+      );
       if (!room) return;
       patchRoom(room.id, {
         sources: room.sources.map((s) => (s.id === id ? { ...s, label } : s)),
@@ -240,7 +257,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const patchActive = useCallback((updater: (room: Room) => Room) => {
     setState((prev) => ({
       ...prev,
-      rooms: prev.rooms.map((r) => (r.id === prev.activeRoomId ? updater(r) : r)),
+      rooms: prev.rooms.map((r) =>
+        r.id === prev.activeRoomId ? updater(r) : r,
+      ),
     }));
   }, []);
 
@@ -294,7 +313,10 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const removeFlag = useCallback(
     (id: string) => {
       if (isCloud) void apiDeleteFlag(id).catch(() => undefined);
-      return patchActive((r) => ({ ...r, flags: r.flags.filter((f) => f.id !== id) }));
+      return patchActive((r) => ({
+        ...r,
+        flags: r.flags.filter((f) => f.id !== id),
+      }));
     },
     [patchActive],
   );
@@ -338,19 +360,37 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       });
   }, [patchRoom]);
 
-  const createRoom = useCallback((kind: RoomKind, company: string, mode: RoomMode = "specific") => {
-    const room = makeRoom(kind, company.trim() || "Untitled room", OWNER_FALLBACK, mode);
-    setState((prev) => ({ activeRoomId: room.id, rooms: [...prev.rooms, room] }));
-    if (isCloud) void saveRoom(room).catch(() => setError("Couldn't create that room."));
-    return room.id;
-  }, []);
+  const createRoom = useCallback(
+    (kind: RoomKind, company: string, mode: RoomMode = "specific") => {
+      const room = makeRoom(
+        kind,
+        company.trim() || "Untitled room",
+        OWNER_FALLBACK,
+        mode,
+      );
+      setState((prev) => ({
+        activeRoomId: room.id,
+        rooms: [...prev.rooms, room],
+      }));
+      if (isCloud)
+        void saveRoom(room).catch(() => setError("Couldn't create that room."));
+      return room.id;
+    },
+    [],
+  );
 
   const duplicateRoom = useCallback((id: string) => {
     const source = stateRef.current.rooms.find((r) => r.id === id);
     if (!source) return id;
     const copy = copyRoom(source);
-    setState((prev) => ({ activeRoomId: copy.id, rooms: [...prev.rooms, copy] }));
-    if (isCloud) void saveRoom(copy).catch(() => setError("Couldn't duplicate that room."));
+    setState((prev) => ({
+      activeRoomId: copy.id,
+      rooms: [...prev.rooms, copy],
+    }));
+    if (isCloud)
+      void saveRoom(copy).catch(() =>
+        setError("Couldn't duplicate that room."),
+      );
     return copy.id;
   }, []);
 
@@ -373,18 +413,26 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       statsSource: "Replace with their numbers",
       footerNote: `Prepared for ${company.trim()} by ${source.account.owner.name} · 1Fort`,
     };
-    setState((prev) => ({ activeRoomId: room.id, rooms: [...prev.rooms, room] }));
-    if (isCloud) void saveRoom(room).catch(() => setError("Couldn't create that room."));
+    setState((prev) => ({
+      activeRoomId: room.id,
+      rooms: [...prev.rooms, room],
+    }));
+    if (isCloud)
+      void saveRoom(room).catch(() => setError("Couldn't create that room."));
     return room.id;
   }, []);
 
   const deleteRoom = useCallback((id: string) => {
-    if (isCloud) void apiDeleteRoom(id).catch(() => setError("Couldn't delete that room."));
+    if (isCloud)
+      void apiDeleteRoom(id).catch(() =>
+        setError("Couldn't delete that room."),
+      );
     setState((prev) => {
       // Never leave the app with zero rooms — there'd be nothing to render.
       if (prev.rooms.length <= 1) return prev;
       const rooms = prev.rooms.filter((r) => r.id !== id);
-      const activeRoomId = prev.activeRoomId === id ? rooms[0].id : prev.activeRoomId;
+      const activeRoomId =
+        prev.activeRoomId === id ? rooms[0].id : prev.activeRoomId;
       return { activeRoomId, rooms };
     });
   }, []);
@@ -415,9 +463,12 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
             No rooms came back.
           </h1>
           <pre className="m-0 overflow-x-auto rounded-md border border-nav-line bg-nav-raised p-3 font-mono text-[11.5px] leading-[1.5] whitespace-pre-wrap text-nav-body">
-            {error ?? "The database returned nothing and no error, which usually means the tables exist but are empty and the first insert was rejected."}
+            {error ??
+              "The database returned nothing and no error, which usually means the tables exist but are empty and the first insert was rejected."}
           </pre>
-          <p className="m-0 text-[11.5px] leading-[1.6] text-nav-faint">{errHint(error)}</p>
+          <p className="m-0 text-[11.5px] leading-[1.6] text-nav-faint">
+            {errHint(error)}
+          </p>
           <div className="flex gap-2">
             <button
               onClick={() => window.location.reload()}
@@ -446,7 +497,8 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     activeRoom,
     activeRoomId: state.activeRoomId,
     vocabulary: vocabularyFor(activeRoom.kind),
-    setActiveRoomId: (id) => setState((prev) => ({ ...prev, activeRoomId: id })),
+    setActiveRoomId: (id) =>
+      setState((prev) => ({ ...prev, activeRoomId: id })),
     updateRoom: patchRoom,
     setRoomStatus: (id, status) => patchRoom(id, { status }),
     createRoom,
@@ -479,7 +531,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     },
   };
 
-  return <RoomsContext.Provider value={value}>{children}</RoomsContext.Provider>;
+  return (
+    <RoomsContext.Provider value={value}>{children}</RoomsContext.Provider>
+  );
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
