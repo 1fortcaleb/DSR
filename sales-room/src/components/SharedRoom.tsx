@@ -151,6 +151,7 @@ export function SharedRoom({ token }: { token: string }) {
       error: null,
       isLive: false,
       regenerate: noop,
+      lastGeneration: null,
       dismissError: noop,
       resetAll: noop,
     };

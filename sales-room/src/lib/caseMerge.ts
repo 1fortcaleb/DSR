@@ -58,3 +58,62 @@ export function mergeCase(current: CaseContent, next: Partial<CaseContent>): Cas
     footerRef: str(next.footerRef, current.footerRef),
   };
 }
+
+/** Human-readable names for the parts of the page a regeneration can touch. */
+const FIELD_LABELS: [keyof CaseContent, string][] = [
+  ["headline", "the headline"],
+  ["framingLabel", "the framing heading"],
+  ["statsLabel", "the figures heading"],
+  ["statsSource", "where the figures came from"],
+  ["changesBody", "what changes"],
+  ["changesLabel", "the what-changes heading"],
+  ["yearOneValue", "the year-one figure"],
+  ["yearOneCaption", "the year-one caption"],
+  ["yearOneLabel", "the year-one heading"],
+  ["yearOneFootnote", "the year-one footnote"],
+  ["nextLabel", "the next-steps heading"],
+  ["footerNote", "the footer"],
+  ["footerRef", "the reference"],
+];
+
+const LIST_LABELS: [keyof CaseContent, string, string][] = [
+  ["framing", "framing line", "framing lines"],
+  ["stats", "figure", "figures"],
+  ["changesBullets", "proof point", "proof points"],
+  ["yearOneRows", "year-one row", "year-one rows"],
+  ["weeks", "next step", "next steps"],
+];
+
+/**
+ * What actually changed, in words a rep can read.
+ *
+ * A regeneration takes the better part of half a minute and can legitimately
+ * decide to change nothing — the sources may not support a rewrite. Without
+ * this, that outcome and an outright failure look exactly the same: the
+ * spinner stops and the page sits there.
+ */
+export function describeCaseChanges(before: CaseContent, after: CaseContent): string[] {
+  const changed: string[] = [];
+
+  for (const [key, label] of FIELD_LABELS) {
+    if (before[key] !== after[key]) changed.push(label);
+  }
+
+  for (const [key, one, many] of LIST_LABELS) {
+    const mine = before[key] as { id: string }[];
+    const theirs = after[key] as { id: string }[];
+    const byId = new Map(theirs.map((t) => [t.id, t]));
+    const count = mine.filter(
+      (item) => JSON.stringify(byId.get(item.id)) !== JSON.stringify(item),
+    ).length;
+    if (count) changed.push(`${count} ${count === 1 ? one : many}`);
+  }
+
+  return changed;
+}
+
+/** "the headline, 3 framing lines and 2 figures" */
+export function joinChanges(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRooms } from "../../context/RoomsContext";
 import { providerName } from "../../lib/video";
+import { joinChanges } from "../../lib/caseMerge";
 import { relativeTime } from "../../lib/vocabulary";
 import type { RoomKind, RoomMode, RoomStatus, RoomVideo } from "../../types";
 import { Button, Grid, ListRow, Section, SelectField, TextField } from "./Field";
@@ -312,7 +313,8 @@ export function CaseEditor() {
 /* ----------------------------------------------------------------- sources */
 
 export function SourcesEditor() {
-  const { activeRoom, updateRoom, toggleSource, renameSource, regenerate, status, error, isLive } =
+  const { activeRoom, updateRoom, toggleSource, renameSource, regenerate, status, error, isLive,
+    lastGeneration } =
     useRooms();
 
   const addSource = () =>
@@ -363,6 +365,20 @@ export function SourcesEditor() {
           {status === "working" ? "Regenerating…" : "Regenerate 1-pager"}
         </Button>
       </div>
+      {/* A regeneration takes half a minute and can legitimately change nothing.
+          Silence afterwards is indistinguishable from a failure. */}
+      {lastGeneration && (
+        <p
+          className={`m-0 text-[11.5px] leading-[1.5] ${
+            lastGeneration.length ? "font-bold text-green" : "text-muted"
+          }`}
+        >
+          {lastGeneration.length
+            ? `Rewrote ${joinChanges(lastGeneration)}.`
+            : "Claude read the sources and left the page as it was — nothing in them supported a change. Add more from the call, or edit it yourself."}
+        </p>
+      )}
+
       <p className="m-0 text-[10.5px] leading-[1.45] text-faint">
         {isLive
           ? "Claude writes the page from the sources switched on above. It won't put a figure on the page that the sources don't state — a slot left empty is a number worth going and finding."

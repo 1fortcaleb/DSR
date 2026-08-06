@@ -16,6 +16,7 @@ import {
   loadState,
   saveState,
 } from "../lib/roomStore";
+import { describeCaseChanges } from "../lib/caseMerge";
 import { GenerationError, generationProvider } from "../lib/generation";
 import { errHint, errText } from "../lib/errors";
 import { isCloud, supabase } from "../lib/supabase";
@@ -78,6 +79,8 @@ interface RoomsContextValue {
   error: string | null;
   isLive: boolean;
   regenerate: () => void;
+  /** What the last regeneration changed. Empty array means "nothing". */
+  lastGeneration: string[] | null;
   dismissError: () => void;
 
   resetAll: () => void;
@@ -296,6 +299,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     [patchActive],
   );
 
+  /** Null until a regeneration finishes; then the list of parts it rewrote. */
+  const [lastGeneration, setLastGeneration] = useState<string[] | null>(null);
+
   const regenerate = useCallback(() => {
     const runId = ++runIdRef.current;
     const snapshot = stateRef.current;
@@ -304,6 +310,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
     setStatus("working");
     setError(null);
+    setLastGeneration(null);
 
     generationProvider
       .generate({
@@ -317,6 +324,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       .then((next) => {
         if (runId !== runIdRef.current) return;
         patchRoom(room.id, { content: next });
+        setLastGeneration(describeCaseChanges(room.content, next));
         setStatus("idle");
       })
       .catch((err: unknown) => {
@@ -458,6 +466,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     error,
     isLive: generationProvider.live,
     regenerate,
+    lastGeneration,
     dismissError: () => {
       setError(null);
       setStatus("idle");

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { Audience } from "../types";
 import { useRooms } from "../context/RoomsContext";
+import { joinChanges } from "../lib/caseMerge";
 import { firstName } from "../lib/vocabulary";
 import { CheckIcon, RefreshIcon, SparkleIcon } from "./icons";
 import { EditableText } from "./EditableText";
@@ -26,6 +27,7 @@ export function CaseView({ audience }: CaseViewProps) {
     error,
     isLive,
     regenerate,
+    lastGeneration,
     dismissError,
   } = useRooms();
   const { content, sources, engagement, account } = activeRoom;
@@ -410,6 +412,18 @@ export function CaseView({ audience }: CaseViewProps) {
               <RefreshIcon className={status === "working" ? "animate-spin" : undefined} />
               {status === "working" ? "Regenerating…" : "Regenerate 1-pager"}
             </button>
+
+            {lastGeneration && (
+              <p
+                className={`m-0 text-[10.5px] leading-[1.5] ${
+                  lastGeneration.length ? "font-bold text-green" : "text-muted"
+                }`}
+              >
+                {lastGeneration.length
+                  ? `Rewrote ${joinChanges(lastGeneration)}.`
+                  : "Claude read the sources and left the page as it was — nothing in them supported a change."}
+              </p>
+            )}
 
             <p className="m-0 text-[10px] leading-[1.45] text-faint">
               {isLive
