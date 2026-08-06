@@ -411,3 +411,40 @@ create policy assets_rw on storage.objects
 drop policy if exists assets_public_read on storage.objects;
 create policy assets_public_read on storage.objects
   for select to anon using (bucket_id = 'assets');
+
+/* -------------------------------------------------------------- playbook */
+
+-- What a good business case looks like, in the team's own words.
+--
+-- This is the one piece of the generation prompt that belongs to 1Fort rather
+-- than to whoever wrote the code. It is deliberately a table and not a
+-- constant in a source file: the people who know what lands are reps, and they
+-- should be able to change it after a call that went badly without waiting on
+-- a deploy.
+--
+-- A single row, team-wide. The fixed id makes "upsert the playbook" a one-line
+-- operation with no chance of a second row appearing.
+create table if not exists public.playbook (
+  id          boolean primary key default true check (id),
+  -- Principles: what makes ours good, in prose.
+  principles  text not null default '',
+  -- A page that worked, pasted whole. The strongest signal available — a model
+  -- matches the shape of a real example far more closely than a list of rules.
+  exemplar    text not null default '',
+  -- What to never do, and why. Kept separate so it can't drown out the rest.
+  avoid       text not null default '',
+  updated_at  timestamptz not null default now(),
+  updated_by  uuid references auth.users(id) default auth.uid()
+);
+
+alter table public.playbook enable row level security;
+
+-- Never reachable by a share-link visitor: it describes how we sell.
+revoke all on public.playbook from anon;
+
+drop policy if exists playbook_team_all on public.playbook;
+create policy playbook_team_all on public.playbook
+  for all to authenticated using (true) with check (true);
+
+-- Seeded empty so the app always has a row to read and edit.
+insert into public.playbook (id) values (true) on conflict (id) do nothing;

@@ -118,7 +118,37 @@ interface Body {
   mode?: string;
   owner?: string;
   current?: Record<string, unknown>;
+  /** The team's own account of what a good page looks like. */
+  playbook?: { principles?: string; exemplar?: string; avoid?: string } | null;
   sources?: { label?: string; text?: string }[];
+}
+
+/**
+ * The playbook, rendered for the prompt.
+ *
+ * It goes before the sources and before the current page, because it is
+ * standing instruction rather than material — the reader of the prompt should
+ * know what they are aiming at before they see what they have to work with.
+ * The exemplar is labelled as illustrative so its specifics don't get copied
+ * into a different company's page.
+ */
+function renderPlaybook(pb: Body["playbook"]): string {
+  if (!pb) return "";
+  const parts: string[] = [];
+  if (pb.principles?.trim()) {
+    parts.push(`### What makes a 1Fort page good\n${pb.principles.trim()}`);
+  }
+  if (pb.exemplar?.trim()) {
+    parts.push(
+      "### A page that worked\nMatch its register, its length and the shape of its argument. Do not reuse its facts, figures or company — those belong to a different reader.\n\n" +
+        pb.exemplar.trim(),
+    );
+  }
+  if (pb.avoid?.trim()) {
+    parts.push(`### Never do this\n${pb.avoid.trim()}`);
+  }
+  if (!parts.length) return "";
+  return `## The team's playbook\n\nThis is written by the people who send these pages and watch how they land. Where it conflicts with your own instincts about business writing, follow it.\n\n${parts.join("\n\n")}`;
 }
 
 function buildPrompt(body: Body): string {
@@ -128,7 +158,10 @@ function buildPrompt(body: Body): string {
       ? `This is the PRE-CALL version. Nobody has had a discovery call yet, so there are no numbers of theirs to use. Describe the kind of operation 1Fort is built for and let the reader recognise themselves — or not. Figures here describe the archetype, not this reader, and statsSource must make that explicit. Do not write anything that implies you know their specific situation.`
       : `This is the SPECIFIC version, written after discovery. It should carry their numbers and their words. Anything general enough to send to a different company is a line that has not done its job.`;
 
+  const playbook = renderPlaybook(body.playbook);
+
   return [
+    ...(playbook ? [playbook, ""] : []),
     `Counterparty: ${body.account || "unnamed"}`,
     `Relationship: ${kindWord}`,
     `Prepared by: ${body.owner || "the 1Fort team"}`,

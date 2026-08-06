@@ -267,3 +267,36 @@ export async function addSharedFlag(
   if (error) throw error;
   return data as FlaggedPassage;
 }
+
+/* -------------------------------------------------------------- playbook */
+
+/**
+ * What the team says a good business case looks like.
+ *
+ * Kept in the database rather than in the prompt source so the people who know
+ * what lands can change it after a call that went badly, without a deploy.
+ */
+export interface Playbook {
+  principles: string;
+  exemplar: string;
+  avoid: string;
+}
+
+export const EMPTY_PLAYBOOK: Playbook = { principles: "", exemplar: "", avoid: "" };
+
+export async function fetchPlaybook(): Promise<Playbook> {
+  const { data, error } = await requireSupabase()
+    .from("playbook")
+    .select("principles, exemplar, avoid")
+    .eq("id", true)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { ...EMPTY_PLAYBOOK, ...data } : EMPTY_PLAYBOOK;
+}
+
+export async function savePlaybook(next: Playbook): Promise<void> {
+  const { error } = await requireSupabase()
+    .from("playbook")
+    .upsert({ id: true, ...next, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}

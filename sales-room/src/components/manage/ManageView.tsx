@@ -3,12 +3,13 @@ import { useRooms } from "../../context/RoomsContext";
 import { relativeTime } from "../../lib/vocabulary";
 import type { RoomKind } from "../../types";
 import { CaseView } from "../CaseView";
-import { ImageIcon, SlidersIcon } from "../icons";
+import { ImageIcon, SlidersIcon, SparkleIcon } from "../icons";
 import { Button, SelectField, TextField } from "./Field";
 import { AccountEditor, CaseEditor, DocumentsEditor, SourcesEditor, VideosEditor } from "./editors";
 import { AssetsEditor } from "./AssetsEditor";
 import { ShareEditor } from "./ShareEditor";
 import { NotesImport } from "./NotesImport";
+import { PlaybookEditor } from "./PlaybookEditor";
 import { useAuth } from "../../context/AuthContext";
 
 type SectionId = "notes" | "account" | "case" | "sources" | "documents" | "videos" | "share";
@@ -41,8 +42,9 @@ export function ManageView({ onExit }: { onExit: () => void }) {
     resetAll,
     vocabulary,
   } = useRooms();
-  // The rail picks a scope: one room's content, or the library that spans rooms.
-  const [scope, setScope] = useState<"room" | "library">("room");
+  // The rail picks a scope: one room's content, or one of the things that
+  // span every room — the asset library and the playbook.
+  const [scope, setScope] = useState<"room" | "library" | "playbook">("room");
   // A new room opens on the paste step: it is the fastest way out of a blank
   // template, and the alternative is staring at "Headline goes here".
   const [section, setSection] = useState<SectionId>("notes");
@@ -169,6 +171,23 @@ export function ManageView({ onExit }: { onExit: () => void }) {
               Asset library
             </span>
           </button>
+          <button
+            onClick={() => setScope("playbook")}
+            className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors ${
+              scope === "playbook"
+                ? "border-periwinkle/40 bg-periwinkle/10"
+                : "border-transparent bg-transparent hover:bg-nav-raised"
+            }`}
+          >
+            <SparkleIcon className="flex-none text-nav-faint" />
+            <span
+              className={`truncate text-[12.5px] ${
+                scope === "playbook" ? "font-bold text-nav-hi" : "text-nav-body"
+              }`}
+            >
+              What good looks like
+            </span>
+          </button>
         </div>
 
         <AccountFooter />
@@ -197,7 +216,11 @@ export function ManageView({ onExit }: { onExit: () => void }) {
               Manage content
             </span>
             <span className="truncate text-[14px] font-bold tracking-[-0.01em] text-navy">
-              {scope === "library" ? "Asset library" : activeRoom.name}
+              {scope === "library"
+                ? "Asset library"
+                : scope === "playbook"
+                  ? "What good looks like"
+                  : activeRoom.name}
             </span>
             {scope === "room" && (
               <span className="flex flex-none items-center gap-1.5 font-mono text-[9.5px] tracking-[0.08em] text-faint uppercase">
@@ -256,6 +279,8 @@ export function ManageView({ onExit }: { onExit: () => void }) {
             <div className="mx-auto w-full min-w-0 max-w-[1040px] px-7 pt-5 pb-16">
               {scope === "library" ? (
                 <AssetsEditor />
+              ) : scope === "playbook" ? (
+                <PlaybookEditor />
               ) : (
                 <>
                   {section === "account" && (

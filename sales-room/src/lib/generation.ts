@@ -1,3 +1,4 @@
+import { fetchPlaybook } from "./api";
 import { mergeCase } from "./caseMerge";
 import { supabase } from "./supabase";
 import type { CaseContent, GeneratedSource, Room } from "../types";
@@ -48,6 +49,11 @@ async function generateViaBackend(request: GenerateRequest): Promise<CaseContent
   const token = data.session?.access_token;
   if (!token) throw new GenerationError("Sign in again — your session has expired.");
 
+  // The team's own description of a good page. Read here rather than on the
+  // server so the route stays a thin proxy with no database of its own — and
+  // an empty or unreachable playbook must never block a generation.
+  const playbook = await fetchPlaybook().catch(() => null);
+
   let res: Response;
   try {
     res = await fetch(ROUTE, {
@@ -59,6 +65,7 @@ async function generateViaBackend(request: GenerateRequest): Promise<CaseContent
         mode: request.mode,
         owner: request.owner,
         current: request.current,
+        playbook,
         sources: used.map((s) => ({ label: s.label, text: s.text })),
       }),
     });
