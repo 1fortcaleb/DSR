@@ -7,6 +7,16 @@
 [functions]
   directory = "netlify/functions"
 
+# A share link is unguessable, but "unguessable" only holds while nothing
+# publishes it. Once the site is public a crawler that ever sees one — a link
+# pasted in a public thread, a referrer header, a browser extension — could put
+# a counterparty's business case in a search index. Nothing under /r/ should be
+# indexed, ever.
+[[headers]]
+  for = "/r/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+
 # Every /r/<token> is a client-side route with no file behind it. Without this
 # a recipient opening a share link gets a 404 from the CDN, not the room.
 [[redirects]]
