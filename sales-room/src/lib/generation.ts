@@ -27,6 +27,14 @@ export class GenerationError extends Error {}
 const ROUTE = "/.netlify/functions/generate-case";
 
 /**
+ * Longer than a generation should ever take, short enough that a rep isn't
+ * watching a spinner forever. A stalled request is indistinguishable from a
+ * slow one from here, and the difference to a rep mid-deal is nil: they need
+ * to be told to try again rather than left guessing.
+ */
+const TIMEOUT_MS = 90_000;
+
+/**
  * Calls Claude through a backend route.
  *
  * The route, not this file, holds the API key — a key bundled into the browser
@@ -58,6 +66,7 @@ async function generateViaBackend(request: GenerateRequest): Promise<CaseContent
   try {
     res = await fetch(ROUTE, {
       method: "POST",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({
         account: request.account,
@@ -69,7 +78,12 @@ async function generateViaBackend(request: GenerateRequest): Promise<CaseContent
         sources: used.map((s) => ({ label: s.label, text: s.text })),
       }),
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new GenerationError(
+        "The generation timed out. Try again — if it keeps happening, trim the notes you've switched on.",
+      );
+    }
     // Running `npm run dev` serves the app but not the function. `netlify dev`
     // serves both, which is the difference the message needs to name.
     throw new GenerationError(
@@ -86,7 +100,17 @@ async function generateViaBackend(request: GenerateRequest): Promise<CaseContent
   const payload = (await res.json().catch(() => null)) as
     | { content?: CaseContent; error?: string }
     | null;
-  if (!res.ok) throw new GenerationError(payload?.error ?? `Generation failed (${res.status}).`);
+  if (!res.ok) {
+    // Netlify kills a function that outruns its time limit and answers with its
+    // own error page, not our JSON. Left unnamed this reads as "Generation
+    // failed (502)", which tells a rep nothing about what to do next.
+    if (!payload && (res.status === 502 || res.status === 504)) {
+      throw new GenerationError(
+        "The generation ran too long and was cut off. Try again with fewer notes switched on.",
+      );
+    }
+    throw new GenerationError(payload?.error ?? `Generation failed (${res.status}).`);
+  }
   if (!payload?.content) throw new GenerationError("The service returned nothing usable.");
 
   return mergeCase(request.current, payload.content);
