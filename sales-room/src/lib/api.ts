@@ -1,3 +1,4 @@
+import { normaliseContent } from "./roomStore";
 import { requireSupabase } from "./supabase";
 import type { FlaggedPassage, Room, RoomFeedback, Verdict } from "../types";
 
@@ -44,7 +45,7 @@ function toRoom(row: RoomRow, feedback: RoomFeedback | null, flags: FlaggedPassa
     status: row.status,
     name: row.name,
     account: row.account,
-    content: row.content,
+    content: normaliseContent(row.content),
     sources: row.sources ?? [],
     documents: row.documents ?? [],
     videos: row.videos ?? [],

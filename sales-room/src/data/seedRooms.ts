@@ -29,23 +29,29 @@ const PARTNERSHIP_CONTENT: CaseContent = {
     { id: "never-quoted", value: "44", unit: "%", label: "Cyber enquiries referred out", accent: "red" },
     { id: "unwritten", value: "$3.8M", label: "Commission leaving the network", accent: "red" },
   ],
-  changesLabel: "How the partnership works",
-  changesBody:
+  approachLabel: "How the partnership works",
+  approachBody:
     "Member brokers get 1Fort quoting under the Vantage brand. We handle carrier connections and servicing; Vantage keeps the relationship and a revenue share on every bound policy.",
-  changesBullets: [
+  approachBullets: [
     { id: "b1", text: "White-labelled quoting for every member firm" },
     { id: "b2", text: "Revenue share on bound premium, paid monthly" },
     { id: "b3", text: "Co-branded onboarding for new members" },
   ],
-  yearOneLabel: "Year one",
-  yearOneValue: "$1.6M",
-  yearOneCaption: "Network premium retained",
-  yearOneRows: [
+  outcomesLabel: "What changes if it works",
+  outcomes: [
+    { id: "o1", label: "Member agencies live on the platform", from: "0", to: "12 in year one" },
+    { id: "o2", label: "Time from referral to first quote", from: "Unmeasured", to: "Same week" },
+  ],
+  outcomesFootnote: "Targets to agree jointly before launch, not commitments yet.",
+  investmentLabel: "Year one",
+  investmentValue: "$1.6M",
+  investmentCaption: "Network premium retained",
+  investmentRows: [
     { id: "hours", label: "Member firms onboarded", value: "60", accent: "ink" },
     { id: "investment", label: "Integration cost to Vantage", value: "$0", accent: "ink" },
     { id: "payback", label: "Revenue share", value: "12% of premium", accent: "green" },
   ],
-  yearOneFootnote: "Modeled on 30% member adoption in year one. Full model in Documents.",
+  investmentFootnote: "Modeled on 30% member adoption in year one. Full model in Documents.",
   nextLabel: "Next 60 days",
   weeks: [
     { id: "w1", num: "WEEK 2", title: "Sign the partnership terms", sub: "Revenue share and branding agreed" },
@@ -54,6 +60,8 @@ const PARTNERSHIP_CONTENT: CaseContent = {
   ],
   footerNote: "Prepared for Vantage Broker Network by Rachel Moss · 1Fort · SOC 2 Type II",
   footerRef: "VBN-PC-0114",
+  champions: [],
+  opponents: [],
 };
 
 export function seedRooms(): Room[] {

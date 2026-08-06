@@ -48,27 +48,35 @@ const CASE_SCHEMA = {
       label: text,
       accent: { type: "string", enum: ["navy", "red"] },
     }),
-    changesLabel: text,
-    changesBody: text,
-    changesBullets: list({ text }),
-    yearOneLabel: text,
-    yearOneValue: text,
-    yearOneCaption: text,
-    yearOneRows: list({
+    approachLabel: text,
+    approachBody: text,
+    approachBullets: list({ text }),
+    outcomesLabel: text,
+    outcomes: list({ label: text, from: text, to: text }),
+    outcomesFootnote: text,
+    investmentLabel: text,
+    investmentValue: text,
+    investmentCaption: text,
+    investmentRows: list({
       label: text,
       value: text,
       accent: { type: "string", enum: ["ink", "green"] },
     }),
-    yearOneFootnote: text,
+    investmentFootnote: text,
     nextLabel: text,
     weeks: list({ num: text, title: text, sub: text }),
     footerNote: text,
     footerRef: text,
+    champions: list({ name: text, role: text, why: text }),
+    opponents: list({ name: text, role: text, why: text }),
   },
   required: [
     "headline", "framingLabel", "framing", "statsLabel", "statsSource", "stats",
-    "changesLabel", "changesBody", "changesBullets", "yearOneLabel", "yearOneValue",
-    "yearOneCaption", "yearOneRows", "yearOneFootnote", "nextLabel", "weeks",
+    "approachLabel", "approachBody", "approachBullets",
+    "outcomesLabel", "outcomes", "outcomesFootnote",
+    "champions", "opponents",
+    "investmentLabel", "investmentValue",
+    "investmentCaption", "investmentRows", "investmentFootnote", "nextLabel", "weeks",
     "footerNote", "footerRef",
   ],
   additionalProperties: false,
@@ -98,11 +106,15 @@ The same applies to claims, not only figures. "Producers rekey every submission"
 
 **stats** — up to four figures from the sources, chosen because they carry the argument, not because they are the four you found. 'value' is the number as written ("11.5", "$1.4M", "1 in 3"), 'unit' is the trailing word if there is one ("days", "portals") and empty otherwise. 'label' says what the figure measures, in the fewest words that stay unambiguous. Use accent "red" for a figure that represents loss or delay, "navy" otherwise. Leave any stat you cannot source exactly as it came to you.
 
-**changesBody and changesBullets** — what is different after, described as operations rather than features. Three bullets at most.
+**approachBody and approachBullets** — the recommended approach: what you are proposing to *do* about the problem. A commitment, not a description of a product. "Put your two highest-volume producers on it for one line of business" is an approach; "1Fort streamlines submissions" is a brochure. Three bullets at most.
 
-**yearOne** — only when the sources carry enough to support it. If they do not, leave the value, caption, rows and footnote as they are.
+**outcomes** — what changes if it works, as a movement rather than a claim. Each has a 'label' naming what moves, a 'from' (where they are today) and a 'to' (where this should get them). "11.5 days" → "under 2" is something the reader can agree or disagree with; "faster quoting" is not. Use their own baseline in 'from' when the sources state it and "—" when they do not. Never invent a 'from' — an unknown baseline is a real finding, and it belongs in outcomesFootnote where it tells the rep what to go and measure.
+
+**investment** — cost, people and time. Ambiguity here is what kills deals: a reader who cannot tell what this costs cannot take it to anyone else, and a page that ducks the question gets filed. Where the sources give real numbers, use them. Where they do not, say what is actually known ("priced per active producer, billed annually") rather than something evasive, and leave the figure as it stands. Never soften a real number into a vague range to make it look smaller.
 
 **weeks** — the first few concrete steps. Real commitments from the sources where they exist, not a generic implementation plan.
+
+**champions and opponents** — who wants this to happen, and who will resist it. These are the rep's own notes: they are stripped from the counterparty's copy server-side and never appear on the page the reader sees, so be blunt rather than diplomatic. Draw them from what people actually said and how they said it. Someone who volunteered a problem unprompted is usually a champion; someone who pushed back on scope, cost, or "we already have a tool for that" usually is not. 'why' should name what is at stake for them personally — the number they own, the work that lands on their team, the tool they chose that this displaces. Name only people the sources actually name. Return an empty list rather than guessing, and keep any existing entries the sources still support.
 
 **footerNote / footerRef / statsSource** — statsSource must name where the figures came from, specifically enough to be checked ("From the 2025 production report", "From discovery, 14 Jul"). If the figures are unchanged from what you were given, leave it as it is.
 

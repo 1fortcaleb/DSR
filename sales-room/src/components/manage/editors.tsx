@@ -209,46 +209,88 @@ export function CaseEditor() {
       </Section>
 
       <Section title="What changes">
-        <TextField label="Section label" value={c.changesLabel} onChange={(v) => setField("changesLabel", v)} mono />
+        <TextField label="Section label" value={c.approachLabel} onChange={(v) => setField("approachLabel", v)} mono />
         <TextField
           label="Body"
-          value={c.changesBody}
-          onChange={(v) => setField("changesBody", v)}
+          value={c.approachBody}
+          onChange={(v) => setField("approachBody", v)}
           multiline
           rows={4}
         />
         <div className="flex flex-col gap-2">
-          {c.changesBullets.map((b) => (
+          {c.approachBullets.map((b) => (
             <ListRow key={b.id}>
               <TextField
                 label="Bullet"
                 value={b.text}
-                onChange={(v) => setListItem("changesBullets", b.id, { text: v })}
+                onChange={(v) => setListItem("approachBullets", b.id, { text: v })}
               />
             </ListRow>
           ))}
         </div>
       </Section>
 
-      <Section title="Year one">
-        <Grid>
-          <TextField label="Section label" value={c.yearOneLabel} onChange={(v) => setField("yearOneLabel", v)} mono />
-          <TextField label="Headline figure" value={c.yearOneValue} onChange={(v) => setField("yearOneValue", v)} />
-        </Grid>
-        <TextField label="Caption" value={c.yearOneCaption} onChange={(v) => setField("yearOneCaption", v)} />
+      <Section
+        title="Target outcomes"
+        hint="What changes if it works, as a movement. A from and a to are something the reader can agree or disagree with; a single number is just a claim."
+      >
+        <TextField
+          label="Section label"
+          value={c.outcomesLabel}
+          onChange={(v) => setField("outcomesLabel", v)}
+          mono
+        />
         <div className="flex flex-col gap-2">
-          {c.yearOneRows.map((row) => (
+          {c.outcomes.map((o) => (
+            <ListRow key={o.id}>
+              <TextField
+                label="Outcome"
+                value={o.label}
+                onChange={(v) => setListItem("outcomes", o.id, { label: v })}
+              />
+              <Grid>
+                <TextField
+                  label="Today"
+                  value={o.from}
+                  onChange={(v) => setListItem("outcomes", o.id, { from: v })}
+                />
+                <TextField
+                  label="Target"
+                  value={o.to}
+                  onChange={(v) => setListItem("outcomes", o.id, { to: v })}
+                />
+              </Grid>
+            </ListRow>
+          ))}
+        </div>
+        <TextField
+          label="Footnote"
+          value={c.outcomesFootnote}
+          onChange={(v) => setField("outcomesFootnote", v)}
+          multiline
+          rows={2}
+        />
+      </Section>
+
+      <Section title="Required investment" hint="Cost, people, time. An unclear number here is what stalls a deal.">
+        <Grid>
+          <TextField label="Section label" value={c.investmentLabel} onChange={(v) => setField("investmentLabel", v)} mono />
+          <TextField label="Headline figure" value={c.investmentValue} onChange={(v) => setField("investmentValue", v)} />
+        </Grid>
+        <TextField label="Caption" value={c.investmentCaption} onChange={(v) => setField("investmentCaption", v)} />
+        <div className="flex flex-col gap-2">
+          {c.investmentRows.map((row) => (
             <ListRow key={row.id}>
               <Grid cols={3}>
                 <TextField
                   label="Label"
                   value={row.label}
-                  onChange={(v) => setListItem("yearOneRows", row.id, { label: v })}
+                  onChange={(v) => setListItem("investmentRows", row.id, { label: v })}
                 />
                 <TextField
                   label="Value"
                   value={row.value}
-                  onChange={(v) => setListItem("yearOneRows", row.id, { value: v })}
+                  onChange={(v) => setListItem("investmentRows", row.id, { value: v })}
                 />
                 <SelectField
                   label="Accent"
@@ -257,7 +299,7 @@ export function CaseEditor() {
                     { value: "ink", label: "Default" },
                     { value: "green", label: "Green" },
                   ]}
-                  onChange={(v) => setListItem("yearOneRows", row.id, { accent: v })}
+                  onChange={(v) => setListItem("investmentRows", row.id, { accent: v })}
                 />
               </Grid>
             </ListRow>
@@ -265,8 +307,8 @@ export function CaseEditor() {
         </div>
         <TextField
           label="Footnote"
-          value={c.yearOneFootnote}
-          onChange={(v) => setField("yearOneFootnote", v)}
+          value={c.investmentFootnote}
+          onChange={(v) => setField("investmentFootnote", v)}
           multiline
           rows={2}
         />
@@ -298,6 +340,22 @@ export function CaseEditor() {
             </ListRow>
           ))}
         </div>
+      </Section>
+
+      {/* Rep-only. Stripped from the share payload server-side, so this is
+          somewhere to be honest about the politics rather than diplomatic. */}
+      <Section
+        title="Who cares about this?"
+        hint="Yours only — never sent, and removed from the share link by the server. Who wants this to happen, and why it matters to them personally."
+      >
+        <StakeholderList field="champions" placeholder="Nobody named yet." />
+      </Section>
+
+      <Section
+        title="Who will hate this?"
+        hint="Also yours only. The objection you haven't answered is the one that kills it in a room you're not in — write it down while you can still do something about it."
+      >
+        <StakeholderList field="opponents" placeholder="Nobody named yet." />
       </Section>
 
       <Section title="Footer">
@@ -653,5 +711,66 @@ export function VideosEditor() {
         </div>
       </Section>
     </div>
+  );
+}
+
+/**
+ * A rep-only list of people and their position.
+ *
+ * Deliberately plain: this is a scratchpad for the politics, and the moment it
+ * feels like a form someone has to fill in properly, nobody writes the honest
+ * version.
+ */
+function StakeholderList({
+  field,
+  placeholder,
+}: {
+  field: "champions" | "opponents";
+  placeholder: string;
+}) {
+  const { activeRoom, setField, setListItem } = useRooms();
+  const people = activeRoom.content[field];
+
+  const add = () =>
+    setField(field, [
+      ...people,
+      { id: `p-${Date.now().toString(36)}`, name: "", role: "", why: "" },
+    ]);
+  const remove = (id: string) =>
+    setField(field, people.filter((p) => p.id !== id));
+
+  return (
+    <>
+      {!people.length && <p className="m-0 text-[12.5px] text-muted">{placeholder}</p>}
+      <div className="flex flex-col gap-2">
+        {people.map((p) => (
+          <ListRow key={p.id} onRemove={() => remove(p.id)}>
+            <Grid>
+              <TextField
+                label="Name"
+                value={p.name}
+                placeholder="Dana Whitfield"
+                onChange={(v) => setListItem(field, p.id, { name: v })}
+              />
+              <TextField
+                label="Role"
+                value={p.role}
+                placeholder="COO"
+                onChange={(v) => setListItem(field, p.id, { role: v })}
+              />
+            </Grid>
+            <TextField
+              label="Why"
+              value={p.why}
+              placeholder="Owns the number this moves — wants it to work."
+              onChange={(v) => setListItem(field, p.id, { why: v })}
+              multiline
+              rows={2}
+            />
+          </ListRow>
+        ))}
+      </div>
+      <Button onClick={add}>Add someone</Button>
+    </>
   );
 }

@@ -191,8 +191,8 @@ export function NotesImport() {
       });
     });
 
-    parsed.bullets.slice(0, content.changesBullets.length).forEach((b, i) => {
-      const bullet = content.changesBullets[i];
+    parsed.bullets.slice(0, content.approachBullets.length).forEach((b, i) => {
+      const bullet = content.approachBullets[i];
       const current = isBlank(bullet.text) ? "" : bullet.text;
       add({
         key: `bullet-${bullet.id}`,
@@ -200,7 +200,7 @@ export function NotesImport() {
         current,
         next: b.slice(0, 120),
         occupied: !!current,
-        apply: () => setListItem("changesBullets", bullet.id, { text: b.slice(0, 120) }),
+        apply: () => setListItem("approachBullets", bullet.id, { text: b.slice(0, 120) }),
       });
     });
 

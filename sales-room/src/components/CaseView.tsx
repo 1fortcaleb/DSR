@@ -39,7 +39,10 @@ export function CaseView({ audience }: CaseViewProps) {
   return (
     <div className="flex flex-wrap items-start">
       <div className="box-border flex flex-1 min-w-0 basis-[560px] justify-center px-10 pt-11 pb-[88px]">
-        <article ref={articleRef} className="box-border flex w-full max-w-[880px] flex-col gap-[46px] rounded-[10px] border border-border-soft bg-white px-[68px] pt-16 pb-14 shadow-[0_1px_2px_rgba(0,1,46,0.04),0_30px_60px_-40px_rgba(0,1,46,0.18)]">
+        <article
+          ref={articleRef}
+          className="box-border flex w-full max-w-[880px] flex-col gap-[46px] rounded-[10px] border border-border-soft bg-white px-[68px] pt-16 pb-14 shadow-[0_1px_2px_rgba(0,1,46,0.04),0_30px_60px_-40px_rgba(0,1,46,0.18)]"
+        >
           <header className="flex flex-col gap-[26px]">
             <div className="flex items-start justify-between gap-6">
               <EditableText
@@ -85,14 +88,18 @@ export function CaseView({ audience }: CaseViewProps) {
                   <EditableText
                     readOnly={ro}
                     value={line.lead}
-                    onChange={(v) => setListItem("framing", line.id, { lead: v })}
+                    onChange={(v) =>
+                      setListItem("framing", line.id, { lead: v })
+                    }
                     inline
                     ariaLabel={`Framing lead: ${line.lead}`}
                   />{" "}
                   <EditableText
                     readOnly={ro}
                     value={line.value}
-                    onChange={(v) => setListItem("framing", line.id, { value: v })}
+                    onChange={(v) =>
+                      setListItem("framing", line.id, { value: v })
+                    }
                     inline
                     ariaLabel={`Framing value: ${line.lead}`}
                     className="text-blue"
@@ -133,7 +140,9 @@ export function CaseView({ audience }: CaseViewProps) {
                     <EditableText
                       readOnly={ro}
                       value={stat.value}
-                      onChange={(v) => setListItem("stats", stat.id, { value: v })}
+                      onChange={(v) =>
+                        setListItem("stats", stat.id, { value: v })
+                      }
                       inline
                       ariaLabel={`${stat.label} value`}
                     />
@@ -143,7 +152,9 @@ export function CaseView({ audience }: CaseViewProps) {
                         <EditableText
                           readOnly={ro}
                           value={stat.unit}
-                          onChange={(v) => setListItem("stats", stat.id, { unit: v })}
+                          onChange={(v) =>
+                            setListItem("stats", stat.id, { unit: v })
+                          }
                           inline
                           ariaLabel={`${stat.label} unit`}
                         />
@@ -153,7 +164,9 @@ export function CaseView({ audience }: CaseViewProps) {
                   <EditableText
                     readOnly={ro}
                     value={stat.label}
-                    onChange={(v) => setListItem("stats", stat.id, { label: v })}
+                    onChange={(v) =>
+                      setListItem("stats", stat.id, { label: v })
+                    }
                     ariaLabel={`Stat label: ${stat.label}`}
                     className="text-[11.5px] leading-[1.45] text-muted"
                   />
@@ -167,8 +180,8 @@ export function CaseView({ audience }: CaseViewProps) {
               <div className="border-b-2 border-border-soft pb-2.5">
                 <EditableText
                   readOnly={ro}
-                  value={content.changesLabel}
-                  onChange={(v) => setField("changesLabel", v)}
+                  value={content.approachLabel}
+                  onChange={(v) => setField("approachLabel", v)}
                   inline
                   ariaLabel="What changes label"
                   className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
@@ -178,19 +191,24 @@ export function CaseView({ audience }: CaseViewProps) {
                 as="p"
                 readOnly={ro}
                 multiline
-                value={content.changesBody}
-                onChange={(v) => setField("changesBody", v)}
+                value={content.approachBody}
+                onChange={(v) => setField("approachBody", v)}
                 ariaLabel="What changes body"
                 className="m-0 text-sm leading-[1.65] text-body"
               />
               <ul className="m-0 flex list-none flex-col gap-[11px] p-0">
-                {content.changesBullets.map((bullet) => (
-                  <li key={bullet.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-2.5 text-[13px] leading-[1.5] text-body">
+                {content.approachBullets.map((bullet) => (
+                  <li
+                    key={bullet.id}
+                    className="grid grid-cols-[auto_minmax(0,1fr)] gap-2.5 text-[13px] leading-[1.5] text-body"
+                  >
                     <CheckIcon className="mt-0.5 flex-none text-live" />
                     <EditableText
                       readOnly={ro}
                       value={bullet.text}
-                      onChange={(v) => setListItem("changesBullets", bullet.id, { text: v })}
+                      onChange={(v) =>
+                        setListItem("approachBullets", bullet.id, { text: v })
+                      }
                       ariaLabel={`Bullet: ${bullet.text}`}
                     />
                   </li>
@@ -198,67 +216,142 @@ export function CaseView({ audience }: CaseViewProps) {
               </ul>
             </div>
 
-            <div className="flex flex-col gap-[18px] rounded-lg bg-row-hover px-6 pt-6 pb-[22px]">
-              <EditableText
-                readOnly={ro}
-                value={content.yearOneLabel}
-                onChange={(v) => setField("yearOneLabel", v)}
-                inline
-                ariaLabel="Year one label"
-                className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
-              />
-              <div className="flex flex-col gap-[3px]">
-                <div className="text-[38px] leading-none font-bold tracking-[-0.03em] text-navy">
+            <div className="flex flex-col gap-[30px]">
+              <div className="flex flex-col gap-[18px]">
+                <div className="border-b-2 border-border-soft pb-2.5">
                   <EditableText
                     readOnly={ro}
-                    value={content.yearOneValue}
-                    onChange={(v) => setField("yearOneValue", v)}
+                    value={content.outcomesLabel}
+                    onChange={(v) => setField("outcomesLabel", v)}
                     inline
-                    ariaLabel="Year one headline figure"
+                    ariaLabel="Target outcomes label"
+                    className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
                   />
                 </div>
+                {/* From → to, because a movement is something the reader can
+                  agree or disagree with. A single number is just a claim. */}
+                <div className="flex flex-col gap-3.5">
+                  {content.outcomes.map((o) => (
+                    <div key={o.id} className="flex flex-col gap-1">
+                      <EditableText
+                        readOnly={ro}
+                        value={o.label}
+                        onChange={(v) =>
+                          setListItem("outcomes", o.id, { label: v })
+                        }
+                        ariaLabel={`Outcome: ${o.label}`}
+                        className="text-[12.5px] leading-[1.4] text-body"
+                      />
+                      <div className="flex items-baseline gap-2">
+                        <EditableText
+                          readOnly={ro}
+                          value={o.from}
+                          onChange={(v) =>
+                            setListItem("outcomes", o.id, { from: v })
+                          }
+                          inline
+                          ariaLabel={`${o.label} today`}
+                          className="text-[13px] text-faint line-through"
+                        />
+                        <span className="text-[13px] text-faintest">
+                          &rarr;
+                        </span>
+                        <EditableText
+                          readOnly={ro}
+                          value={o.to}
+                          onChange={(v) =>
+                            setListItem("outcomes", o.id, { to: v })
+                          }
+                          inline
+                          ariaLabel={`${o.label} target`}
+                          className="text-[15px] font-bold tracking-[-0.01em] text-green"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 <EditableText
+                  as="p"
                   readOnly={ro}
-                  value={content.yearOneCaption}
-                  onChange={(v) => setField("yearOneCaption", v)}
-                  ariaLabel="Year one caption"
-                  className="text-xs text-muted"
+                  multiline
+                  value={content.outcomesFootnote}
+                  onChange={(v) => setField("outcomesFootnote", v)}
+                  ariaLabel="Target outcomes footnote"
+                  className="m-0 text-[10px] leading-[1.5] italic text-faint"
                 />
               </div>
-              <div className="h-px bg-border" />
-              <div className="flex flex-col gap-3">
-                {content.yearOneRows.map((row) => (
-                  <div key={row.id} className="flex items-baseline justify-between gap-3">
+
+              <div className="flex flex-col gap-[18px] rounded-lg bg-row-hover px-6 pt-6 pb-[22px]">
+                <EditableText
+                  readOnly={ro}
+                  value={content.investmentLabel}
+                  onChange={(v) => setField("investmentLabel", v)}
+                  inline
+                  ariaLabel="Investment label"
+                  className="font-mono text-[10px] tracking-[0.14em] text-[#666782] uppercase"
+                />
+                <div className="flex flex-col gap-[3px]">
+                  <div className="text-[38px] leading-none font-bold tracking-[-0.03em] text-navy">
                     <EditableText
                       readOnly={ro}
-                      value={row.label}
-                      onChange={(v) => setListItem("yearOneRows", row.id, { label: v })}
+                      value={content.investmentValue}
+                      onChange={(v) => setField("investmentValue", v)}
                       inline
-                      ariaLabel={`Row label: ${row.label}`}
-                      className="text-xs text-muted"
-                    />
-                    <EditableText
-                      readOnly={ro}
-                      value={row.value}
-                      onChange={(v) => setListItem("yearOneRows", row.id, { value: v })}
-                      inline
-                      ariaLabel={`Row value: ${row.label}`}
-                      className={`text-[13px] font-bold ${
-                        row.accent === "green" ? "text-green" : "text-gray-900"
-                      }`}
+                      ariaLabel="Investment headline figure"
                     />
                   </div>
-                ))}
+                  <EditableText
+                    readOnly={ro}
+                    value={content.investmentCaption}
+                    onChange={(v) => setField("investmentCaption", v)}
+                    ariaLabel="Investment caption"
+                    className="text-xs text-muted"
+                  />
+                </div>
+                <div className="h-px bg-border" />
+                <div className="flex flex-col gap-3">
+                  {content.investmentRows.map((row) => (
+                    <div
+                      key={row.id}
+                      className="flex items-baseline justify-between gap-3"
+                    >
+                      <EditableText
+                        readOnly={ro}
+                        value={row.label}
+                        onChange={(v) =>
+                          setListItem("investmentRows", row.id, { label: v })
+                        }
+                        inline
+                        ariaLabel={`Row label: ${row.label}`}
+                        className="text-xs text-muted"
+                      />
+                      <EditableText
+                        readOnly={ro}
+                        value={row.value}
+                        onChange={(v) =>
+                          setListItem("investmentRows", row.id, { value: v })
+                        }
+                        inline
+                        ariaLabel={`Row value: ${row.label}`}
+                        className={`text-[13px] font-bold ${
+                          row.accent === "green"
+                            ? "text-green"
+                            : "text-gray-900"
+                        }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <EditableText
+                  as="p"
+                  readOnly={ro}
+                  multiline
+                  value={content.investmentFootnote}
+                  onChange={(v) => setField("investmentFootnote", v)}
+                  ariaLabel="Investment footnote"
+                  className="m-0 text-[10px] leading-[1.5] italic text-faint"
+                />
               </div>
-              <EditableText
-                as="p"
-                readOnly={ro}
-                multiline
-                value={content.yearOneFootnote}
-                onChange={(v) => setField("yearOneFootnote", v)}
-                ariaLabel="Year one footnote"
-                className="m-0 text-[10px] leading-[1.5] italic text-faint"
-              />
             </div>
           </section>
 
@@ -290,7 +383,9 @@ export function CaseView({ audience }: CaseViewProps) {
                   <EditableText
                     readOnly={ro}
                     value={week.title}
-                    onChange={(v) => setListItem("weeks", week.id, { title: v })}
+                    onChange={(v) =>
+                      setListItem("weeks", week.id, { title: v })
+                    }
                     ariaLabel={`${week.num} title`}
                     className="text-[13px] font-bold text-gray-900"
                   />
@@ -334,18 +429,25 @@ export function CaseView({ audience }: CaseViewProps) {
           <SignOff />
 
           <div className="flex flex-col gap-3.5 rounded-[10px] border border-border bg-white p-5">
-            <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">Your contact</span>
+            <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">
+              Your contact
+            </span>
             <div className="flex items-center gap-2.5">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">
                 {initials(account.owner.name)}
               </span>
               <span className="flex flex-col">
-                <span className="text-[12.5px] font-bold text-gray-900">{account.owner.name}</span>
-                <span className="text-[11px] text-faint">{account.owner.org} · replies same day</span>
+                <span className="text-[12.5px] font-bold text-gray-900">
+                  {account.owner.name}
+                </span>
+                <span className="text-[11px] text-faint">
+                  {account.owner.org} · replies same day
+                </span>
               </span>
             </div>
             <p className="m-0 text-[11.5px] leading-[1.55] text-muted">
-              Every number on this page traces back to a file in Documents. Ask about any of them.
+              Every number on this page traces back to a file in Documents. Ask
+              about any of them.
             </p>
           </div>
           <div className="flex flex-col gap-2.5">
@@ -364,12 +466,17 @@ export function CaseView({ audience }: CaseViewProps) {
           <div className="flex flex-col gap-4 rounded-[10px] border border-border bg-white p-5">
             <div className="flex items-center gap-2">
               <SparkleIcon className="text-blue" />
-              <span className="text-[12.5px] font-bold text-gray-900">Generated from</span>
+              <span className="text-[12.5px] font-bold text-gray-900">
+                Generated from
+              </span>
             </div>
 
             <div className="flex flex-col gap-2.5">
               {sources.map((source) => (
-                <div key={source.id} className="flex items-center justify-between gap-2.5">
+                <div
+                  key={source.id}
+                  className="flex items-center justify-between gap-2.5"
+                >
                   <EditableText
                     value={source.label}
                     onChange={(v) => renameSource(source.id, v)}
@@ -380,7 +487,11 @@ export function CaseView({ audience }: CaseViewProps) {
                   <button
                     onClick={() => toggleSource(source.id)}
                     aria-pressed={source.used}
-                    title={source.used ? "Exclude from the next draft" : "Include in the next draft"}
+                    title={
+                      source.used
+                        ? "Exclude from the next draft"
+                        : "Include in the next draft"
+                    }
                     className={`flex-none cursor-pointer rounded border-none bg-transparent px-1 font-mono text-[10px] transition-colors hover:underline ${
                       source.used ? "text-live" : "text-faintest"
                     }`}
@@ -393,7 +504,9 @@ export function CaseView({ audience }: CaseViewProps) {
 
             {error && (
               <div className="flex items-start justify-between gap-2 rounded-md bg-red/10 px-2.5 py-2">
-                <span className="text-[11px] leading-[1.45] text-red">{error}</span>
+                <span className="text-[11px] leading-[1.45] text-red">
+                  {error}
+                </span>
                 <button
                   onClick={dismissError}
                   aria-label="Dismiss error"
@@ -409,7 +522,9 @@ export function CaseView({ audience }: CaseViewProps) {
               disabled={status === "working"}
               className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-white px-3 py-[9px] font-sans text-xs font-bold text-blue transition-all hover:border-blue-border hover:bg-blue-bg disabled:cursor-not-allowed disabled:text-faint"
             >
-              <RefreshIcon className={status === "working" ? "animate-spin" : undefined} />
+              <RefreshIcon
+                className={status === "working" ? "animate-spin" : undefined}
+              />
               {status === "working" ? "Regenerating…" : "Regenerate 1-pager"}
             </button>
 
@@ -443,7 +558,9 @@ export function CaseView({ audience }: CaseViewProps) {
                 <div key={e.id} className="flex flex-col gap-1.5">
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs text-body">{e.label}</span>
-                    <span className="font-mono text-[11px] text-gray-900">{e.time}</span>
+                    <span className="font-mono text-[11px] text-gray-900">
+                      {e.time}
+                    </span>
                   </div>
                   <div className="h-1 rounded-full bg-gray-100">
                     <div

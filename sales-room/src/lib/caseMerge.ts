@@ -1,4 +1,4 @@
-import type { CaseContent } from "../types";
+import type { CaseContent, CaseStakeholder } from "../types";
 
 /**
  * Takes the model's version of the page but keeps the page's structure.
@@ -34,6 +34,20 @@ export function mergeCase(current: CaseContent, next: Partial<CaseContent>): Cas
     });
   };
 
+  const people = (mine: CaseStakeholder[], theirs: unknown): CaseStakeholder[] => {
+    if (!Array.isArray(theirs) || !theirs.length) return mine;
+    return theirs
+      .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
+      .filter((t) => typeof t.name === "string" && t.name.trim())
+      .slice(0, 8)
+      .map((t, i) => ({
+        id: `p-${i}-${String(t.name).slice(0, 12).replace(/\W+/g, "")}`,
+        name: String(t.name),
+        role: typeof t.role === "string" ? t.role : "",
+        why: typeof t.why === "string" ? t.why : "",
+      }));
+  };
+
   const str = (v: unknown, fallback: string) => (typeof v === "string" && v.trim() ? v : fallback);
 
   return {
@@ -44,14 +58,23 @@ export function mergeCase(current: CaseContent, next: Partial<CaseContent>): Cas
     statsLabel: str(next.statsLabel, current.statsLabel),
     statsSource: str(next.statsSource, current.statsSource),
     stats: byId(current.stats, next.stats),
-    changesLabel: str(next.changesLabel, current.changesLabel),
-    changesBody: str(next.changesBody, current.changesBody),
-    changesBullets: byId(current.changesBullets, next.changesBullets),
-    yearOneLabel: str(next.yearOneLabel, current.yearOneLabel),
-    yearOneValue: str(next.yearOneValue, current.yearOneValue),
-    yearOneCaption: str(next.yearOneCaption, current.yearOneCaption),
-    yearOneRows: byId(current.yearOneRows, next.yearOneRows),
-    yearOneFootnote: str(next.yearOneFootnote, current.yearOneFootnote),
+    approachLabel: str(next.approachLabel, current.approachLabel),
+    approachBody: str(next.approachBody, current.approachBody),
+    approachBullets: byId(current.approachBullets, next.approachBullets),
+    outcomesLabel: str(next.outcomesLabel, current.outcomesLabel),
+    outcomes: byId(current.outcomes, next.outcomes),
+    outcomesFootnote: str(next.outcomesFootnote, current.outcomesFootnote),
+    // Stakeholders are proposed, not edited: the model reads them out of the
+    // call rather than revising a slot, so there are no ids to match on. A
+    // returned list replaces; an absent or empty one leaves the rep's own
+    // notes alone, because "found nobody" must never wipe what they wrote.
+    champions: people(current.champions, next.champions),
+    opponents: people(current.opponents, next.opponents),
+    investmentLabel: str(next.investmentLabel, current.investmentLabel),
+    investmentValue: str(next.investmentValue, current.investmentValue),
+    investmentCaption: str(next.investmentCaption, current.investmentCaption),
+    investmentRows: byId(current.investmentRows, next.investmentRows),
+    investmentFootnote: str(next.investmentFootnote, current.investmentFootnote),
     nextLabel: str(next.nextLabel, current.nextLabel),
     weeks: byId(current.weeks, next.weeks),
     footerNote: str(next.footerNote, current.footerNote),
@@ -65,12 +88,14 @@ const FIELD_LABELS: [keyof CaseContent, string][] = [
   ["framingLabel", "the framing heading"],
   ["statsLabel", "the figures heading"],
   ["statsSource", "where the figures came from"],
-  ["changesBody", "what changes"],
-  ["changesLabel", "the what-changes heading"],
-  ["yearOneValue", "the year-one figure"],
-  ["yearOneCaption", "the year-one caption"],
-  ["yearOneLabel", "the year-one heading"],
-  ["yearOneFootnote", "the year-one footnote"],
+  ["approachBody", "the recommended approach"],
+  ["approachLabel", "the approach heading"],
+  ["investmentValue", "the investment figure"],
+  ["investmentCaption", "the investment caption"],
+  ["investmentLabel", "the investment heading"],
+  ["investmentFootnote", "the investment footnote"],
+  ["outcomesLabel", "the outcomes heading"],
+  ["outcomesFootnote", "the outcomes footnote"],
   ["nextLabel", "the next-steps heading"],
   ["footerNote", "the footer"],
   ["footerRef", "the reference"],
@@ -79,8 +104,11 @@ const FIELD_LABELS: [keyof CaseContent, string][] = [
 const LIST_LABELS: [keyof CaseContent, string, string][] = [
   ["framing", "framing line", "framing lines"],
   ["stats", "figure", "figures"],
-  ["changesBullets", "proof point", "proof points"],
-  ["yearOneRows", "year-one row", "year-one rows"],
+  ["approachBullets", "proof point", "proof points"],
+  ["investmentRows", "investment line", "investment lines"],
+  ["outcomes", "target outcome", "target outcomes"],
+  ["champions", "champion", "champions"],
+  ["opponents", "blocker", "blockers"],
   ["weeks", "next step", "next steps"],
 ];
 
@@ -102,10 +130,13 @@ export function describeCaseChanges(before: CaseContent, after: CaseContent): st
   for (const [key, one, many] of LIST_LABELS) {
     const mine = before[key] as { id: string }[];
     const theirs = after[key] as { id: string }[];
-    const byId = new Map(theirs.map((t) => [t.id, t]));
-    const count = mine.filter(
-      (item) => JSON.stringify(byId.get(item.id)) !== JSON.stringify(item),
-    ).length;
+    const wasById = new Map(mine.map((t) => [t.id, JSON.stringify(t)]));
+    // Counted over the *new* list, not the old one: the stakeholder lists grow
+    // when the model finds someone, and counting only what was already there
+    // would report two champions appearing out of nowhere as "no change".
+    let count = theirs.filter((item) => wasById.get(item.id) !== JSON.stringify(item)).length;
+    // Items that vanished are a change too.
+    count += Math.max(0, mine.length - theirs.length);
     if (count) changed.push(`${count} ${count === 1 ? one : many}`);
   }
 

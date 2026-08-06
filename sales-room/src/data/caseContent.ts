@@ -26,24 +26,31 @@ export const INITIAL_CASE_CONTENT: CaseContent = {
     { id: "never-quoted", value: "38", unit: "%", label: "Submissions never quoted out", accent: "red" },
     { id: "unwritten", value: "$1.4M", label: "Annual premium left unwritten", accent: "red" },
   ],
-  changesLabel: "What changes",
-  changesBody:
+  approachLabel: "What we're proposing",
+  approachBody:
     "Producers submit once in 1Fort. We push to Coalition, At-Bay, Chubb, Corvus, Beazley and Travelers in parallel, return bindable quotes in minutes, and generate the comparison and proposal for you.",
-  changesBullets: [
+  approachBullets: [
     { id: "b1", text: "One application, six markets, no rekeying" },
     { id: "b2", text: "AI coverage comparison the insured can actually read" },
     { id: "b3", text: "Bind, invoice and collect in the same thread" },
   ],
-  yearOneLabel: "Year one",
-  yearOneValue: "$2.1M",
-  yearOneCaption: "Incremental written premium",
-  yearOneRows: [
-    { id: "hours", label: "Producer hours returned", value: "4,800", accent: "ink" },
-    { id: "investment", label: "Platform investment", value: "$96,000", accent: "ink" },
-    { id: "payback", label: "Payback", value: "3.2 months", accent: "green" },
+  outcomesLabel: "What changes if it works",
+  outcomes: [
+    { id: "o1", label: "Submission to first quote", from: "11.5 days", to: "Under 2 days" },
+    { id: "o2", label: "Submissions quoted out", from: "2 in 3", to: "Effectively all" },
+    { id: "o3", label: "Producer hours on rekeying", from: "~120 / year", to: "Near zero" },
   ],
-  yearOneFootnote:
-    "Modeled on your 2025 cyber and E&O volume at a 12% hit-rate lift. Full model in Documents.",
+  outcomesFootnote: "Measured against the 2025 production report. We agree the baseline before the pilot starts.",
+  investmentLabel: "What it takes",
+  investmentValue: "$96,000",
+  investmentCaption: "Platform, year one, 40 producers",
+  investmentRows: [
+    { id: "platform", label: "Platform", value: "$96,000 / year", accent: "ink" },
+    { id: "people", label: "Your people", value: "One ops lead, ~4 hrs/week for 6 weeks", accent: "ink" },
+    { id: "payback", label: "Pays for itself at", value: "3.2 months", accent: "green" },
+  ],
+  investmentFootnote:
+    "Priced on your 40 producers. No per-submission fee, so the cost does not move when volume does.",
   nextLabel: "Next 30 days",
   weeks: [
     {
@@ -62,6 +69,22 @@ export const INITIAL_CASE_CONTENT: CaseContent = {
   ],
   footerNote: "Prepared for Meridian Risk Partners by Rachel Moss · 1Fort · SOC 2 Type II",
   footerRef: "MRP-BC-0427",
+  champions: [
+    {
+      id: "c1",
+      name: "Dana Whitfield",
+      role: "COO",
+      why: "Owns the turnaround number this moves. Raised the rekeying problem unprompted on the first call.",
+    },
+  ],
+  opponents: [
+    {
+      id: "x1",
+      name: "Marcus Reed",
+      role: "Head of IT",
+      why: "Chose the current AMS integration and will read this as replacing it. Wants a security review before anything touches carrier data.",
+    },
+  ],
 };
 
 /**

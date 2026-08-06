@@ -105,29 +105,85 @@ export interface CaseWeek {
   sub: string;
 }
 
-/** Every rep-editable string on the business case page. */
+/**
+ * A target outcome: what changes if this works, stated as a movement.
+ *
+ * From/to rather than a single number, because "faster quoting" is an
+ * aspiration and "11.5 days to under 2" is something the reader can agree or
+ * disagree with. That is the whole job of the page.
+ */
+export interface CaseOutcome {
+  id: string;
+  label: string;
+  /** Where they are now. Empty when the baseline isn't known yet. */
+  from: string;
+  /** Where this should get them. */
+  to: string;
+}
+
+/**
+ * Someone whose position on this decides whether it happens.
+ *
+ * Rep-only. Never rendered in the counterparty's view and stripped from the
+ * share payload server-side — naming a colleague as opposed, in writing, on a
+ * page that gets forwarded, is a hard thing to take back.
+ */
+export interface CaseStakeholder {
+  id: string;
+  name: string;
+  /** Their role or team, as the reader would recognise it. */
+  role: string;
+  /** Why they want this, or why they'll resist it. */
+  why: string;
+}
+
+/**
+ * Every rep-editable string on the business case page.
+ *
+ * The order of the fields is the order of the argument: an executive priority,
+ * the problem, the evidence, what we propose, what changes if it works, what
+ * it costs, and what happens next. The two stakeholder lists sit outside that
+ * argument — they are the rep's own read of the politics, and they never leave
+ * the building.
+ */
 export interface CaseContent {
   kicker: string;
   pageCount: string;
+  /** Tied to an executive priority, never to the product. */
   headline: string;
+  /** Despite X → can't achieve Z → which means (persons) → deal with R → costs S. */
   framingLabel: string;
   framing: CaseFramingLine[];
+  /** Evidence for the problem, not for the solution. */
   statsLabel: string;
   statsSource: string;
   stats: CaseStat[];
-  changesLabel: string;
-  changesBody: string;
-  changesBullets: CaseBullet[];
-  yearOneLabel: string;
-  yearOneValue: string;
-  yearOneCaption: string;
-  yearOneRows: CaseRow[];
-  yearOneFootnote: string;
+  /** What we are proposing to do about it. A commitment, not a description. */
+  approachLabel: string;
+  approachBody: string;
+  approachBullets: CaseBullet[];
+  /** What changes if it works. Measurable wherever the sources allow. */
+  outcomesLabel: string;
+  outcomes: CaseOutcome[];
+  outcomesFootnote: string;
+  /** Cost, people, time. Ambiguity here is what kills deals. */
+  investmentLabel: string;
+  investmentValue: string;
+  investmentCaption: string;
+  investmentRows: CaseRow[];
+  investmentFootnote: string;
   nextLabel: string;
   weeks: CaseWeek[];
   footerNote: string;
   footerRef: string;
+  /** Rep-only: who wants this to happen. Never sent to the counterparty. */
+  champions: CaseStakeholder[];
+  /** Rep-only: who will resist it, and why. Never sent to the counterparty. */
+  opponents: CaseStakeholder[];
 }
+
+/** Fields that must never reach the counterparty. Enforced server-side too. */
+export const REP_ONLY_CASE_FIELDS = ["champions", "opponents"] as const;
 
 /* -------------------------------------------------------------- feedback */
 

@@ -213,7 +213,12 @@ begin
     'kind',            v_room.kind,
     'mode',            v_room.room_mode,
     'account',         v_room.account,
-    'content',         v_room.content,
+    -- The rep's read of the politics travels inside `content`, so it has to be
+    -- taken out here. Naming a colleague as opposed to this, in writing, on a
+    -- page that gets forwarded, is not a thing you can take back. Stripped
+    -- server-side rather than hidden in the client: a hidden field is still in
+    -- the response body, and the response body is readable.
+    'content',         v_room.content - 'champions' - 'opponents',
     'documents',       v_room.documents,
     'videos',          v_videos,
     'curatedVideoIds', v_room.curated_video_ids,

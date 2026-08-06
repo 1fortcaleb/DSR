@@ -43,6 +43,7 @@ export function loadState(): RoomsState {
       mode: r.mode ?? "specific",
       feedback: r.feedback ?? null,
       flags: r.flags ?? [],
+      content: normaliseContent(r.content),
     }));
     return { activeRoomId, rooms };
   } catch {
@@ -103,22 +104,29 @@ const BLANK_CONTENT: CaseContent = {
     { id: "s3", value: "—", unit: "", label: "Metric three", accent: "red" },
     { id: "s4", value: "—", label: "Metric four", accent: "red" },
   ],
-  changesLabel: "What changes",
-  changesBody: "Describe what changes for them.",
-  changesBullets: [
-    { id: "b1", text: "First proof point" },
-    { id: "b2", text: "Second proof point" },
-    { id: "b3", text: "Third proof point" },
+  approachLabel: "What we're proposing",
+  approachBody: "State what you propose to do about it.",
+  approachBullets: [
+    { id: "b1", text: "First thing you'll do" },
+    { id: "b2", text: "Second thing you'll do" },
+    { id: "b3", text: "Third thing you'll do" },
   ],
-  yearOneLabel: "Year one",
-  yearOneValue: "—",
-  yearOneCaption: "Headline outcome",
-  yearOneRows: [
-    { id: "r1", label: "Metric", value: "—", accent: "ink" },
-    { id: "r2", label: "Investment", value: "—", accent: "ink" },
-    { id: "r3", label: "Payback", value: "—", accent: "green" },
+  outcomesLabel: "What changes if it works",
+  outcomes: [
+    { id: "o1", label: "First outcome", from: "—", to: "—" },
+    { id: "o2", label: "Second outcome", from: "—", to: "—" },
+    { id: "o3", label: "Third outcome", from: "—", to: "—" },
   ],
-  yearOneFootnote: "Add the assumptions behind these figures.",
+  outcomesFootnote: "Say how each of these would be measured.",
+  investmentLabel: "What it takes",
+  investmentValue: "—",
+  investmentCaption: "Total, year one",
+  investmentRows: [
+    { id: "r1", label: "Platform", value: "—", accent: "ink" },
+    { id: "r2", label: "Your people", value: "—", accent: "ink" },
+    { id: "r3", label: "Time to live", value: "—", accent: "green" },
+  ],
+  investmentFootnote: "Be specific. An unclear number here is what stalls a deal.",
   nextLabel: "Next 30 days",
   weeks: [
     { id: "w1", num: "WEEK 1", title: "First milestone", sub: "What happens" },
@@ -127,6 +135,8 @@ const BLANK_CONTENT: CaseContent = {
   ],
   footerNote: "Prepared by 1Fort",
   footerRef: "REF-0000",
+  champions: [],
+  opponents: [],
 };
 
 
@@ -162,24 +172,32 @@ const ARCHETYPE_CONTENT: CaseContent = {
     { id: "unquoted", value: "1 in 3", label: "Submissions never quoted out", accent: "red" },
     { id: "leak", value: "5-figure", label: "Premium left unwritten, per producer, per year", accent: "red" },
   ],
-  changesLabel: "What changes",
-  changesBody:
+  approachLabel: "What we're proposing",
+  approachBody:
     "Producers submit once in 1Fort. We push to your markets in parallel, return bindable quotes in minutes, and generate the comparison and proposal for you.",
-  changesBullets: [
+  approachBullets: [
     { id: "b1", text: "One application, every market you use, no rekeying" },
     { id: "b2", text: "AI coverage comparison the insured can actually read" },
     { id: "b3", text: "Bind, invoice and collect in the same thread" },
   ],
-  yearOneLabel: "What it's usually worth",
-  yearOneValue: "3–5×",
-  yearOneCaption: "Return in year one, on the agencies we've measured",
-  yearOneRows: [
-    { id: "r1", label: "Producer hours returned", value: "~120 / producer", accent: "ink" },
-    { id: "r2", label: "Platform investment", value: "Scales with seats", accent: "ink" },
-    { id: "r3", label: "Typical payback", value: "Under 6 months", accent: "green" },
+  outcomesLabel: "What changes if it works",
+  outcomes: [
+    { id: "o1", label: "Submission to first quote", from: "11 days", to: "Under 2" },
+    { id: "o2", label: "Markets reached per submission", from: "1 at a time", to: "All of them, in parallel" },
+    { id: "o3", label: "Submissions quoted out", from: "2 in 3", to: "Effectively all" },
   ],
-  yearOneFootnote:
-    "Ranges from agencies running this line through 1Fort. We build the version with your numbers in it after one call.",
+  outcomesFootnote:
+    "Typical of the agencies we onboard. We build the version with your baseline in it after one call.",
+  investmentLabel: "What it takes",
+  investmentValue: "Scales with seats",
+  investmentCaption: "Priced per producer, not per submission",
+  investmentRows: [
+    { id: "r1", label: "Platform", value: "Per active producer, billed annually", accent: "ink" },
+    { id: "r2", label: "Your people", value: "One ops lead, a few hours a week to start", accent: "ink" },
+    { id: "r3", label: "Time to first bound policy", value: "Weeks, not quarters", accent: "green" },
+  ],
+  investmentFootnote:
+    "We give you the exact number for your seat count on the first call — before you have to take it to anyone.",
   nextLabel: "If this sounds like you",
   weeks: [
     { id: "w1", num: "STEP 1", title: "A 20-minute call", sub: "Your book, your carriers, where it jams" },
@@ -188,6 +206,8 @@ const ARCHETYPE_CONTENT: CaseContent = {
   ],
   footerNote: "Prepared by 1Fort · figures are typical, not yours",
   footerRef: "1F-PRE",
+  champions: [],
+  opponents: [],
 };
 
 export function createRoom(
@@ -238,4 +258,46 @@ export function duplicateRoom(room: Room): Room {
   copy.lastViewedAt = null;
   copy.updatedAt = new Date().toISOString();
   return copy;
+}
+
+/**
+ * Brings a stored room's content up to the current shape.
+ *
+ * Rooms saved before the page was restructured carry the old keys, and a
+ * missing list is not a cosmetic problem — `content.outcomes.map(...)` on
+ * undefined takes the whole page down. Renamed fields keep their text, genuinely
+ * new ones start from the blank template, and anything unrecognised is dropped.
+ *
+ * Applied on every load, local and cloud, so no room can reach a renderer in a
+ * shape the renderer doesn't expect.
+ */
+export function normaliseContent(raw: unknown): CaseContent {
+  const c = (raw ?? {}) as Record<string, unknown>;
+  const blank = structuredClone(BLANK_CONTENT);
+
+  // The three fields that were renamed when the page gained a proper
+  // "recommended approach" and split cost out from return.
+  const renamed: Record<string, string> = {
+    changesLabel: "approachLabel",
+    changesBody: "approachBody",
+    changesBullets: "approachBullets",
+    yearOneLabel: "investmentLabel",
+    yearOneValue: "investmentValue",
+    yearOneCaption: "investmentCaption",
+    yearOneRows: "investmentRows",
+    yearOneFootnote: "investmentFootnote",
+  };
+  for (const [old, next] of Object.entries(renamed)) {
+    if (c[next] === undefined && c[old] !== undefined) c[next] = c[old];
+  }
+
+  const out = { ...blank } as unknown as Record<string, unknown>;
+  for (const key of Object.keys(blank)) {
+    const value = c[key];
+    if (value === undefined || value === null) continue;
+    // A list that arrived as something else would break its renderer.
+    if (Array.isArray((blank as unknown as Record<string, unknown>)[key]) !== Array.isArray(value)) continue;
+    out[key] = value;
+  }
+  return out as unknown as CaseContent;
 }
