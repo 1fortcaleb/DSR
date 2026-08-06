@@ -8,6 +8,7 @@ import { EditableText } from "./EditableText";
 import { SignOff } from "./SignOff";
 import { SelectionFlagger } from "./SelectionFlagger";
 import { ResponsesPanel } from "./ResponsesPanel";
+import { StakeholderPanel } from "./StakeholderPanel";
 import { ShareButton } from "./ShareButton";
 
 interface CaseViewProps {
@@ -548,6 +549,8 @@ export function CaseView({ audience }: CaseViewProps) {
           </div>
 
           <ResponsesPanel />
+
+          <StakeholderPanel />
 
           <div className="flex flex-col gap-3.5 rounded-[10px] border border-border bg-white p-5">
             <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">

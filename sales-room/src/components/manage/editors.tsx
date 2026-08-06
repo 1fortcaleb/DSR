@@ -342,22 +342,6 @@ export function CaseEditor() {
         </div>
       </Section>
 
-      {/* Rep-only. Stripped from the share payload server-side, so this is
-          somewhere to be honest about the politics rather than diplomatic. */}
-      <Section
-        title="Who cares about this?"
-        hint="Yours only — never sent, and removed from the share link by the server. Who wants this to happen, and why it matters to them personally."
-      >
-        <StakeholderList field="champions" placeholder="Nobody named yet." />
-      </Section>
-
-      <Section
-        title="Who will hate this?"
-        hint="Also yours only. The objection you haven't answered is the one that kills it in a room you're not in — write it down while you can still do something about it."
-      >
-        <StakeholderList field="opponents" placeholder="Nobody named yet." />
-      </Section>
-
       <Section title="Footer">
         <Grid>
           <TextField label="Note" value={c.footerNote} onChange={(v) => setField("footerNote", v)} />
@@ -711,66 +695,5 @@ export function VideosEditor() {
         </div>
       </Section>
     </div>
-  );
-}
-
-/**
- * A rep-only list of people and their position.
- *
- * Deliberately plain: this is a scratchpad for the politics, and the moment it
- * feels like a form someone has to fill in properly, nobody writes the honest
- * version.
- */
-function StakeholderList({
-  field,
-  placeholder,
-}: {
-  field: "champions" | "opponents";
-  placeholder: string;
-}) {
-  const { activeRoom, setField, setListItem } = useRooms();
-  const people = activeRoom.content[field];
-
-  const add = () =>
-    setField(field, [
-      ...people,
-      { id: `p-${Date.now().toString(36)}`, name: "", role: "", why: "" },
-    ]);
-  const remove = (id: string) =>
-    setField(field, people.filter((p) => p.id !== id));
-
-  return (
-    <>
-      {!people.length && <p className="m-0 text-[12.5px] text-muted">{placeholder}</p>}
-      <div className="flex flex-col gap-2">
-        {people.map((p) => (
-          <ListRow key={p.id} onRemove={() => remove(p.id)}>
-            <Grid>
-              <TextField
-                label="Name"
-                value={p.name}
-                placeholder="Dana Whitfield"
-                onChange={(v) => setListItem(field, p.id, { name: v })}
-              />
-              <TextField
-                label="Role"
-                value={p.role}
-                placeholder="COO"
-                onChange={(v) => setListItem(field, p.id, { role: v })}
-              />
-            </Grid>
-            <TextField
-              label="Why"
-              value={p.why}
-              placeholder="Owns the number this moves — wants it to work."
-              onChange={(v) => setListItem(field, p.id, { why: v })}
-              multiline
-              rows={2}
-            />
-          </ListRow>
-        ))}
-      </div>
-      <Button onClick={add}>Add someone</Button>
-    </>
   );
 }
