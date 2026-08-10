@@ -55,20 +55,58 @@ jobs:
           # database password.
           PGPASSWORD_URI: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          # Reach the server before touching the schema, so the common setup
-          # failure reports itself as a setup failure. Supabase's direct host is
-          # IPv6-only on newer projects and GitHub's runners have no IPv6, which
-          # otherwise surfaces as an unexplained network error.
-          if ! psql "$PGPASSWORD_URI" --no-psqlrc --quiet --command 'select 1' >/dev/null 2>connect.err; then
+          URI="$PGPASSWORD_URI"
+
+          # Reach the server before touching the schema, so a setup problem
+          # reports itself as one rather than as a failed migration.
+          if psql "$URI" --no-psqlrc --quiet --command 'select 1' >/dev/null 2>connect.err; then
+            echo "Connected."
+          elif grep -qiE 'unreachable|could not translate|no route|timed out' connect.err; then
+            # Supabase's direct host (db.<ref>.supabase.co) resolves to IPv6
+            # only, and GitHub runners have no IPv6 at all. The session pooler
+            # is reachable over IPv4 and accepts the same statements, but its
+            # hostname embeds a region that the direct URI doesn't carry.
+            # Rather than make someone go and look it up, try the regions.
+            echo "Direct host is IPv6-only and unreachable from here. Trying the session pooler."
+
+            REST="${URI#*://}"
+            PW="${REST%%@*}"; PW="${PW#*:}"
+            HOST="${REST#*@}"; HOST="${HOST%%:*}"; HOST="${HOST%%/*}"
+            REF="${HOST#db.}"; REF="${REF%%.supabase.co}"
+
+            if [ "$REF" = "$HOST" ]; then
+              echo "::error::Host is '$HOST', which isn't a direct Supabase host, so there is no pooler to fall back to."
+              exit 1
+            fi
+
+            FOUND=""
+            for N in 0 1; do
+              for REGION in us-east-1 us-east-2 us-west-1 us-west-2 \
+                            eu-west-1 eu-west-2 eu-west-3 eu-central-1 eu-central-2 eu-north-1 \
+                            ap-south-1 ap-southeast-1 ap-southeast-2 ap-northeast-1 ap-northeast-2 \
+                            ca-central-1 sa-east-1; do
+                CANDIDATE="postgresql://postgres.${REF}:${PW}@aws-${N}-${REGION}.pooler.supabase.com:5432/postgres?connect_timeout=4"
+                if psql "$CANDIDATE" --no-psqlrc --quiet --command 'select 1' >/dev/null 2>/dev/null; then
+                  FOUND="aws-${N}-${REGION}.pooler.supabase.com"
+                  URI="$CANDIDATE"
+                  break 2
+                fi
+              done
+            done
+
+            if [ -z "$FOUND" ]; then
+              echo "::error::Couldn't reach the database on the direct host or on any session pooler."
+              echo "Get the Session pooler string from Supabase (Connect → Direct →"
+              echo "Session pooler) and put it in the SUPABASE_DB_URL secret."
+              sed -E 's/:[^:@/]+@/:***@/g' connect.err
+              exit 1
+            fi
+
+            echo "Connected via $FOUND."
+            echo "::notice::Reached the database through the session pooler at ${FOUND}. Worth putting that host in SUPABASE_DB_URL so future runs skip the search: postgresql://postgres.${REF}:<password>@${FOUND}:5432/postgres"
+          else
             echo "::error::Couldn't connect to the database."
-            if grep -qiE 'unreachable|could not translate|no route|timeout|timed out' connect.err; then
-              echo "This looks like the IPv6 problem: the direct connection host"
-              echo "(db.<ref>.supabase.co) has no IPv4 address, and GitHub runners"
-              echo "are IPv4-only. Use the Session pooler string instead — same"
-              echo "port 5432, host aws-<n>-<region>.pooler.supabase.com — and"
-              echo "update the SUPABASE_DB_URL secret. Do not use the transaction"
-              echo "pooler on 6543; it rejects these statements."
-            elif grep -qiE 'password|authentication' connect.err; then
+            if grep -qiE 'password|authentication' connect.err; then
               echo "The password in SUPABASE_DB_URL was rejected. If it contains"
               echo "special characters they have to be percent-encoded, or reset"
               echo "it under Project Settings → Database."
@@ -82,7 +120,7 @@ jobs:
           # --single-transaction with ON_ERROR_STOP means a file with a mistake
           # in it leaves the database exactly as it was, rather than half
           # migrated — which is the state that is genuinely hard to recover.
-          psql "$PGPASSWORD_URI" \
+          psql "$URI" \
             --variable=ON_ERROR_STOP=1 \
             --single-transaction \
             --no-psqlrc \
