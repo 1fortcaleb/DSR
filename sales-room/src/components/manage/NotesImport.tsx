@@ -62,7 +62,8 @@ interface Change {
  * the original.
  */
 export function NotesImport() {
-  const { activeRoom, updateRoom, setField, setListItem, renameSource } = useRooms();
+  const { activeRoom, updateRoom, setField, setListItem, renameSource, regenerate, status } =
+    useRooms();
   const { content, account } = activeRoom;
   const [text, setText] = useState("");
   const [overwrite, setOverwrite] = useState(false);
@@ -240,11 +241,24 @@ export function NotesImport() {
       )
     : [];
 
+  /**
+   * Apply the import, then hand straight to the model.
+   *
+   * The parser only ever fills the scaffolding — company, source label, and
+   * whatever figures it can find in the text. It cannot write a headline or a
+   * problem framing, because those take judgement about what the call meant.
+   * Leaving generation as a separate button on another screen meant the honest
+   * outcome of "paste your notes" was a half-filled page with sentence
+   * fragments in the stat slots, and no indication that the actual writing step
+   * existed. Pasting notes should produce a page.
+   */
   function applyAll() {
     if (!parsed) return;
     for (const change of willChange) change.apply();
     keepAsSource();
     setApplied(willChange.map((c) => c.label));
+    // After the source lands on the room, so the generation can read it.
+    setTimeout(regenerate, 0);
   }
 
   /** Keeps the notes on the room so a later regeneration can draw on them. */
@@ -375,10 +389,20 @@ export function NotesImport() {
             </p>
 
             {applied && applied.length > 0 && (
-              <p className="m-0 flex items-center gap-1.5 text-[12px] font-bold text-green">
-                <CheckIcon size={12} />
-                Done: {[...new Set(applied)].join(", ")}.
-              </p>
+              <div className="flex flex-col gap-1.5">
+                <p className="m-0 flex items-center gap-1.5 text-[12px] font-bold text-green">
+                  <CheckIcon size={12} />
+                  Done: {[...new Set(applied)].join(", ")}.
+                </p>
+                {/* The parser's half is the boring half. Say that the writing
+                    is now happening, so a page that still reads like a template
+                    is understood as "not finished yet" rather than "broken". */}
+                <p className="m-0 text-[11.5px] leading-[1.5] text-muted">
+                  {status === "working"
+                    ? "Writing the page from these notes — the headline and problem framing take about half a minute."
+                    : "Writing the page from these notes. Open Business case when it finishes."}
+                </p>
+              </div>
             )}
           </>
         )}
