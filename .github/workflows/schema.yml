@@ -1,0 +1,67 @@
+# Applies supabase/schema.sql to the database whenever it changes.
+#
+# Every schema change used to mean someone opening the Supabase dashboard and
+# pasting the file into the SQL editor by hand. That is a deploy step performed
+# by a person, which means it gets forgotten, done out of order, or done against
+# the wrong project — and the app then fails in ways that look like bugs.
+#
+# The file is written to be re-runnable from scratch (create ... if not exists,
+# drop policy if exists, create or replace), so applying the whole thing is both
+# the migration and the desired end state. There is nothing to keep in order.
+name: Apply database schema
+
+on:
+  push:
+    # Only when the schema actually changes; a UI commit shouldn't touch the
+    # database at all.
+    paths:
+      - "supabase/schema.sql"
+      - ".github/workflows/schema.yml"
+  # So it can be re-run against a restored or newly created project.
+  workflow_dispatch:
+
+concurrency:
+  # Two runs applying the same file at once would deadlock on the policy drops.
+  group: schema-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the connection string is configured
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL is not set."
+            echo "Add it under Settings → Secrets and variables → Actions."
+            echo "Supabase → Project Settings → Database → Connection string → URI."
+            echo "Use the direct connection on port 5432, not the pooler on 6543:"
+            echo "the pooler rejects some of the statements this file needs."
+            exit 1
+          fi
+
+      - name: Install the Postgres client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Apply schema
+        env:
+          # Read from the secret store, never echoed: the URI contains the
+          # database password.
+          PGPASSWORD_URI: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          # --single-transaction with ON_ERROR_STOP means a file with a mistake
+          # in it leaves the database exactly as it was, rather than half
+          # migrated — which is the state that is genuinely hard to recover.
+          psql "$PGPASSWORD_URI" \
+            --variable=ON_ERROR_STOP=1 \
+            --single-transaction \
+            --no-psqlrc \
+            --quiet \
+            --file=supabase/schema.sql
+          echo "Schema applied."
