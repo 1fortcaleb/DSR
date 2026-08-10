@@ -55,6 +55,30 @@ jobs:
           # database password.
           PGPASSWORD_URI: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          # Reach the server before touching the schema, so the common setup
+          # failure reports itself as a setup failure. Supabase's direct host is
+          # IPv6-only on newer projects and GitHub's runners have no IPv6, which
+          # otherwise surfaces as an unexplained network error.
+          if ! psql "$PGPASSWORD_URI" --no-psqlrc --quiet --command 'select 1' >/dev/null 2>connect.err; then
+            echo "::error::Couldn't connect to the database."
+            if grep -qiE 'unreachable|could not translate|no route|timeout|timed out' connect.err; then
+              echo "This looks like the IPv6 problem: the direct connection host"
+              echo "(db.<ref>.supabase.co) has no IPv4 address, and GitHub runners"
+              echo "are IPv4-only. Use the Session pooler string instead — same"
+              echo "port 5432, host aws-<n>-<region>.pooler.supabase.com — and"
+              echo "update the SUPABASE_DB_URL secret. Do not use the transaction"
+              echo "pooler on 6543; it rejects these statements."
+            elif grep -qiE 'password|authentication' connect.err; then
+              echo "The password in SUPABASE_DB_URL was rejected. If it contains"
+              echo "special characters they have to be percent-encoded, or reset"
+              echo "it under Project Settings → Database."
+            fi
+            # The detail can name the host but never the password, which psql
+            # does not print.
+            sed -E 's/:[^:@/]+@/:***@/g' connect.err
+            exit 1
+          fi
+
           # --single-transaction with ON_ERROR_STOP means a file with a mistake
           # in it leaves the database exactly as it was, rather than half
           # migrated — which is the state that is genuinely hard to recover.
