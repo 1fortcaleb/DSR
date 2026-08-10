@@ -1,5 +1,10 @@
 -- 1Fort deal rooms — schema, row-level security, and the anonymous share path.
--- Paste into the Supabase SQL editor and run. Safe to re-run.
+--
+-- Applied automatically by .github/workflows/schema.yml on every push that
+-- changes this file. Nobody should be pasting it into the SQL editor by hand;
+-- if you find yourself doing that, the workflow is failing and the run log
+-- will say why.
+-- Safe to re-run from scratch: every statement is idempotent.
 
 create extension if not exists pgcrypto;
 
