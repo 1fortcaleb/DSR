@@ -280,9 +280,22 @@ export function NotesImport() {
             setApplied(null);
           }}
           rows={10}
-          placeholder={`Meridian Risk Partners <> 1Fort — Discovery Call\nJul 24, 2026\n\nAttendees: Dana Whitfield (COO), Rachel Moss (1Fort)\n\nSummary\n- 40 producers submitting cyber via email and spreadsheets\n- Median time to first quote is 11.5 days\n- $1.4M of unwritten premium annually\n\nNext steps\n- Pilot with two producers`}
+          // A worked example here read as pasted content: same monospace face,
+          // ten lines of it, filling the box. Someone who had not yet pasted
+          // anything could look straight at an empty field and see their notes.
+          // An instruction cannot be mistaken for the thing it is asking for.
+          placeholder="Paste the note here — raw Granola copy-out or full transcript, messy is fine."
           className="w-full resize-y rounded-md border border-border bg-white px-3 py-2.5 font-mono text-[12px] leading-[1.6] text-body outline-none transition-colors placeholder:text-faintest focus:border-blue focus:ring-2 focus:ring-blue-bg"
         />
+
+        {/* Says out loud that something is in the box. Grey placeholder text in
+            a monospace field is easy to mistake for content, and the cost of
+            that mistake is a rep generating from nothing and blaming the model. */}
+        {text.trim() && (
+          <span className="font-mono text-[9.5px] tracking-[0.08em] text-faint uppercase">
+            {text.trim().length.toLocaleString()} characters pasted
+          </span>
+        )}
 
         {parsed && !nothingFound && (
           <>
