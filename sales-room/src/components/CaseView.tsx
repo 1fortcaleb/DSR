@@ -8,6 +8,7 @@ import { EditableText } from "./EditableText";
 import { SignOff } from "./SignOff";
 import { SelectionFlagger } from "./SelectionFlagger";
 import { ResponsesPanel } from "./ResponsesPanel";
+import { RedlineThread } from "./RedlineThread";
 import { StakeholderPanel } from "./StakeholderPanel";
 import { ShareButton } from "./ShareButton";
 
@@ -31,6 +32,8 @@ export function CaseView({ audience }: CaseViewProps) {
     lastGeneration,
     dismissError,
   } = useRooms();
+  // Only unsettled marks belong beside the page; the rest are history.
+  const openMarks = activeRoom.flags.filter((f) => f.status === "open");
   const { content, sources, engagement, account } = activeRoom;
   const articleRef = useRef<HTMLElement | null>(null);
 
@@ -429,10 +432,27 @@ export function CaseView({ audience }: CaseViewProps) {
         </article>
       </div>
 
-      {!isRep && <SelectionFlagger containerRef={articleRef} />}
+      <SelectionFlagger
+        containerRef={articleRef}
+        side={isRep ? "us" : "them"}
+      />
 
       {!isRep && (
         <div className="sticky top-0 box-border flex max-h-screen flex-none basis-[336px] flex-col gap-[26px] overflow-y-auto px-10 pt-11 pb-[60px]">
+          {openMarks.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <span className="font-mono text-[10px] tracking-[0.12em] text-faint uppercase">
+                Your changes · {openMarks.length}
+              </span>
+              {/* They can't accept their own proposal — the page is the rep's —
+                  but the thread has to be answerable from this side or it is a
+                  suggestion box with extra steps. */}
+              {openMarks.map((mark) => (
+                <RedlineThread key={mark.id} mark={mark} canDecide={false} />
+              ))}
+            </div>
+          )}
+
           <SignOff />
 
           <div className="flex flex-col gap-3.5 rounded-[10px] border border-border bg-white p-5">

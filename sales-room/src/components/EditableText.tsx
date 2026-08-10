@@ -1,4 +1,5 @@
 import {
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -7,6 +8,8 @@ import {
   type KeyboardEvent,
   type Ref,
 } from "react";
+import { RoomsContext } from "../context/RoomsContext";
+import { RedlineText } from "./RedlineText";
 
 interface EditableTextProps {
   value: string;
@@ -59,6 +62,10 @@ export function EditableText({
 }: EditableTextProps) {
   /** An em-dash is the templates' way of saying "not filled in yet". */
   const unfilled = !value.trim() || value.trim() === "—";
+  // Read straight from context rather than passed down: every line on the page
+  // can carry a mark, and threading the list through each of them would put the
+  // whole redline model into the signature of every caller.
+  const redlines = useContext(RoomsContext)?.activeRoom.flags ?? [];
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   /**
@@ -67,7 +74,9 @@ export function EditableText({
    * so it is copied across explicitly rather than via a class — a class would
    * also have to win a specificity race against the caller's own leading.
    */
-  const [box, setBox] = useState<{ height: number; lineHeight: string } | null>(null);
+  const [box, setBox] = useState<{ height: number; lineHeight: string } | null>(
+    null,
+  );
   const boxHeight = box?.height ?? null;
   const displayRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -100,7 +109,11 @@ export function EditableText({
   const Tag = as;
 
   if (readOnly) {
-    return <Tag className={className}>{value}</Tag>;
+    return (
+      <Tag className={className}>
+        <RedlineText value={value} redlines={redlines} />
+      </Tag>
+    );
   }
 
   function startEditing() {
@@ -199,7 +212,7 @@ export function EditableText({
           {placeholder}
         </span>
       ) : (
-        value
+        <RedlineText value={value} redlines={redlines} />
       )}
     </Tag>
   );

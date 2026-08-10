@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { useRooms } from "../context/RoomsContext";
 import { firstName } from "../lib/vocabulary";
 import { FlagIcon, XIcon } from "./icons";
 
 interface Anchor {
   quote: string;
+  /** The whole line it came from, so the mark lands on one field only. */
+  context: string;
   /** Viewport coordinates of the selection, for a fixed-position chip. */
   x: number;
   y: number;
@@ -15,10 +23,19 @@ interface Anchor {
  * control for every line. They highlight text the way they would in any
  * document; a chip appears only then.
  */
-export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTMLElement | null> }) {
-  const { activeRoom, flagPassage } = useRooms();
+export function SelectionFlagger({
+  containerRef,
+  side = "them",
+}: {
+  containerRef: RefObject<HTMLElement | null>;
+  /** Which side is marking up; the rep gets the same gesture on their own page. */
+  side?: "us" | "them";
+}) {
+  const { activeRoom, flagPassage, markPassage } = useRooms();
+  const raise = side === "us" ? markPassage : flagPassage;
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [note, setNote] = useState("");
+  const [proposed, setProposed] = useState("");
   const [writing, setWriting] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const owner = firstName(activeRoom.account.owner.name) || "your contact";
@@ -38,8 +55,18 @@ export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTM
       setAnchor(null);
       return;
     }
+    // The nearest labelled ancestor is one EditableText, and its text is that
+    // field's whole value — which is what disambiguates a short quote from the
+    // same characters elsewhere on the page.
+    const start = node.nodeType === 1 ? (node as Element) : node.parentElement;
+    const field = start?.closest("[aria-label]");
     const rect = sel.getRangeAt(0).getBoundingClientRect();
-    setAnchor({ quote: text, x: rect.left + rect.width / 2, y: rect.top });
+    setAnchor({
+      quote: text,
+      context: field?.textContent?.trim() ?? "",
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
   }, [containerRef, writing]);
 
   useEffect(() => {
@@ -50,7 +77,8 @@ export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTM
   useEffect(() => {
     if (!writing) return;
     function onDown(e: MouseEvent) {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) close();
+      if (cardRef.current && !cardRef.current.contains(e.target as Node))
+        close();
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") close();
@@ -67,11 +95,14 @@ export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTM
     setWriting(false);
     setAnchor(null);
     setNote("");
+    setProposed("");
   }
 
   function send() {
-    if (!anchor || !note.trim()) return;
-    flagPassage(anchor.quote, note);
+    // Either half is enough: a replacement with no argument is still a clear
+    // ask, and a question with no replacement is still worth answering.
+    if (!anchor || (!note.trim() && !proposed.trim())) return;
+    raise(anchor.quote, note, proposed, anchor.context);
     window.getSelection()?.removeAllRanges();
     close();
   }
@@ -93,7 +124,7 @@ export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTM
         <div className="flex w-[340px] flex-col gap-2.5 rounded-lg bg-nav p-3.5 shadow-[0_16px_40px_-12px_rgba(0,1,46,0.5)]">
           <div className="flex items-start justify-between gap-2">
             <span className="font-mono text-[9.5px] tracking-[0.12em] text-periwinkle uppercase">
-              What's wrong with this?
+              Change this to
             </span>
             <button
               onClick={close}
@@ -103,26 +134,41 @@ export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTM
               <XIcon size={11} />
             </button>
           </div>
-          <p className="m-0 line-clamp-2 border-l-2 border-nav-line pl-2.5 text-[12px] leading-[1.5] text-nav-muted italic">
-            “{anchor.quote}”
+
+          {/* The struck original sits above the box so the swap is visible as
+              they type it, the way a marked-up page reads. */}
+          <p className="m-0 line-clamp-2 text-[12px] leading-[1.5] text-nav-faint line-through decoration-red/70">
+            {anchor.quote}
           </p>
-          <textarea
+
+          <input
             autoFocus
+            value={proposed}
+            onChange={(e) => setProposed(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) send();
+            }}
+            placeholder="What it should say"
+            className="w-full rounded-md border border-nav-line bg-nav-raised px-2.5 py-2 font-sans text-[12.5px] leading-[1.5] font-bold text-white outline-none placeholder:font-normal placeholder:text-nav-faint focus:border-periwinkle"
+          />
+
+          <textarea
             rows={2}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send();
             }}
-            placeholder="Closer to $2.6M…"
-            className="w-full resize-y rounded-md border border-nav-line bg-nav-raised px-2.5 py-2 font-sans text-[12.5px] leading-[1.5] text-white outline-none placeholder:text-nav-faint focus:border-periwinkle"
+            placeholder="Why — optional, but it's what gets it accepted"
+            className="w-full resize-y rounded-md border border-nav-line bg-nav-raised px-2.5 py-2 font-sans text-[12px] leading-[1.5] text-nav-body outline-none placeholder:text-nav-faint focus:border-periwinkle"
           />
+
           <button
             onClick={send}
-            disabled={!note.trim()}
+            disabled={!note.trim() && !proposed.trim()}
             className="cursor-pointer rounded-md border-none bg-periwinkle px-3 py-2 font-sans text-[12px] font-bold text-nav transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Send to {owner}
+            {proposed.trim() ? `Suggest to ${owner}` : `Ask ${owner}`}
           </button>
         </div>
       ) : (
@@ -131,7 +177,7 @@ export function SelectionFlagger({ containerRef }: { containerRef: RefObject<HTM
           className="flex cursor-pointer items-center gap-1.5 rounded-full border-none bg-nav px-3.5 py-2 font-sans text-[12px] font-bold text-white shadow-[0_8px_24px_-8px_rgba(0,1,46,0.5)] transition-colors hover:bg-nav-raised"
         >
           <FlagIcon size={11} className="text-amber" />
-          This isn't right
+          Suggest a change
         </button>
       )}
     </div>

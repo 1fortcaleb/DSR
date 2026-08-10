@@ -17,6 +17,7 @@ import {
   saveState,
 } from "../lib/roomStore";
 import { describeCaseChanges } from "../lib/caseMerge";
+import { applyRedline } from "../lib/redline";
 import { GenerationError, generationProvider } from "../lib/generation";
 import { errHint, errText } from "../lib/errors";
 import { isCloud, supabase } from "../lib/supabase";
@@ -26,6 +27,7 @@ import {
   fetchRooms,
   saveRoom,
   setFlagResolved,
+  updateFlag,
 } from "../lib/api";
 import { vocabularyFor, type Vocabulary } from "../lib/vocabulary";
 import type {
@@ -74,7 +76,23 @@ interface RoomsContextValue {
   submitFeedback: (verdict: Verdict, message?: string) => void;
   withdrawFeedback: () => void;
   /** Attach a comment to a passage they highlighted. */
-  flagPassage: (quote: string, note: string) => void;
+  flagPassage: (
+    quote: string,
+    note: string,
+    proposed?: string | null,
+    context?: string,
+  ) => void;
+  /** The rep marking up their own page. */
+  markPassage: (
+    quote: string,
+    note: string,
+    proposed?: string | null,
+    context?: string,
+  ) => void;
+  replyToRedline: (id: string, text: string, side?: "us" | "them") => void;
+  /** Rewrites the page with the proposed wording and closes the mark. */
+  acceptRedline: (id: string) => void;
+  rejectRedline: (id: string) => void;
   resolveFlag: (id: string) => void;
   removeFlag: (id: string) => void;
 
@@ -283,18 +301,114 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   );
 
   const flagPassage = useCallback(
-    (quote: string, note: string) =>
+    (quote: string, note: string, proposed?: string | null, context = "") =>
       patchActive((r) => {
         const flag: FlaggedPassage = {
           id: `flag-${Math.random().toString(36).slice(2, 9)}`,
           // Long selections are trimmed: the rep needs to recognise the passage,
           // not re-read it.
           quote: quote.trim().slice(0, 240),
+          context: context.trim(),
+          proposed: proposed?.trim() ? proposed.trim() : null,
           note: note.trim(),
           at: new Date().toISOString(),
           by: r.account.counterparty.name || "The counterparty",
+          side: "them",
+          status: "open",
+          replies: [],
         };
         return { ...r, flags: [...r.flags, flag] };
+      }),
+    [patchActive],
+  );
+
+  /** The rep marking up their own page — the other half of a negotiation. */
+  const markPassage = useCallback(
+    (quote: string, note: string, proposed?: string | null, context = "") =>
+      patchActive((r) => {
+        const flag: FlaggedPassage = {
+          id: `flag-${Math.random().toString(36).slice(2, 9)}`,
+          quote: quote.trim().slice(0, 240),
+          context: context.trim(),
+          proposed: proposed?.trim() ? proposed.trim() : null,
+          note: note.trim(),
+          at: new Date().toISOString(),
+          by: r.account.owner.name || "Us",
+          side: "us",
+          status: "open",
+          replies: [],
+        };
+        return { ...r, flags: [...r.flags, flag] };
+      }),
+    [patchActive],
+  );
+
+  const replyToRedline = useCallback(
+    (id: string, text: string, side: "us" | "them" = "us") =>
+      patchActive((r) => {
+        const reply = {
+          id: `re-${Math.random().toString(36).slice(2, 9)}`,
+          side,
+          by:
+            (side === "us"
+              ? r.account.owner.name
+              : r.account.counterparty.name) || "Someone",
+          text: text.trim(),
+          at: new Date().toISOString(),
+        };
+        const flags = r.flags.map((f) =>
+          f.id === id ? { ...f, replies: [...f.replies, reply] } : f,
+        );
+        if (isCloud) {
+          const next = flags.find((f) => f.id === id);
+          if (next)
+            void updateFlag(id, { replies: next.replies }).catch(
+              () => undefined,
+            );
+        }
+        return { ...r, flags };
+      }),
+    [patchActive],
+  );
+
+  /**
+   * Accepting rewrites the page, which is the difference between a redline and
+   * a comment. If the wording moved on since the mark was raised the quote is
+   * gone and there is nothing to swap, so the mark closes without pretending
+   * an edit happened.
+   */
+  const acceptRedline = useCallback(
+    (id: string) =>
+      patchActive((r) => {
+        const mark = r.flags.find((f) => f.id === id);
+        if (!mark) return r;
+        const { content } = mark.proposed
+          ? applyRedline(r.content, mark.quote, mark.proposed, mark.context)
+          : { content: r.content };
+        if (isCloud)
+          void updateFlag(id, { status: "accepted" }).catch(() => undefined);
+        return {
+          ...r,
+          content,
+          flags: r.flags.map((f) =>
+            f.id === id ? { ...f, status: "accepted" as const } : f,
+          ),
+        };
+      }),
+    [patchActive],
+  );
+
+  const rejectRedline = useCallback(
+    (id: string) =>
+      patchActive((r) => {
+        if (isCloud)
+          void updateFlag(id, { status: "rejected" }).catch(() => undefined);
+        return {
+          ...r,
+          flags: r.flags.map((f) =>
+            f.id === id ? { ...f, status: "rejected" as const } : f,
+          ),
+        };
       }),
     [patchActive],
   );
@@ -512,6 +626,10 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     submitFeedback,
     withdrawFeedback,
     flagPassage,
+    markPassage,
+    replyToRedline,
+    acceptRedline,
+    rejectRedline,
     resolveFlag,
     removeFlag,
     status,

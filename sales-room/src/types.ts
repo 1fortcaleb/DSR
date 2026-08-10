@@ -205,19 +205,55 @@ export interface RoomFeedback {
   by: string;
 }
 
+/** One turn in the conversation hanging off a redline. */
+export interface RedlineReply {
+  id: string;
+  /** Which side of the table it came from, so the thread reads as a dialogue. */
+  side: "us" | "them";
+  by: string;
+  text: string;
+  at: string;
+}
+
 /**
- * A specific passage the counterparty highlighted and commented on. Raised by
- * selecting text, so the page carries no per-line controls and the gesture
- * costs nothing until they actually want to say something.
+ * A mark on one passage of the page.
+ *
+ * Modelled on redlining a contract rather than filling in a feedback form: you
+ * strike the words you disagree with and write what they should say instead.
+ * A proposal is the point — "this is wrong" starts an argument, "make it four
+ * days" starts a negotiation, and only the second one can be accepted.
+ *
+ * `proposed` is null when someone only wants to ask a question, which is a real
+ * thing people do to a document and shouldn't require inventing a replacement.
+ *
+ * Raised by selecting text, so the page carries no per-line controls and the
+ * gesture costs nothing until there is something to say.
  */
 export interface FlaggedPassage {
   id: string;
   /** The text they selected, stored verbatim so the rep sees what they meant. */
   quote: string;
+  /**
+   * The line the quote was taken from, whole, as it read when they marked it.
+   *
+   * Without this a short quote is ambiguous: "11.5" appears in a stat, in an
+   * outcome and in the footnote, and a mark on one of them would strike all
+   * three and rewrite whichever came first. The full line identifies which one
+   * they meant. Empty on marks raised before anchoring existed.
+   */
+  context: string;
+  /** What it should say instead. Null for a comment with no counter-proposal. */
+  proposed: string | null;
+  /** Why — the argument for the change, or the question being asked. */
   note: string;
   at: string;
   by: string;
-  /** Set once the rep has dealt with it. */
+  /** Who raised it. Both sides can mark up: that is what makes it a negotiation. */
+  side: "us" | "them";
+  /** Accepted rewrites the page; rejected keeps the thread but drops the mark. */
+  status: "open" | "accepted" | "rejected";
+  replies: RedlineReply[];
+  /** Legacy: superseded by `status`, kept so old rows still load. */
   resolved?: boolean;
 }
 

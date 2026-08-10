@@ -453,3 +453,93 @@ create policy playbook_team_all on public.playbook
 
 -- Seeded empty so the app always has a row to read and edit.
 insert into public.playbook (id) values (true) on conflict (id) do nothing;
+
+/* --------------------------------------------------------------- redlines */
+
+-- A flag started life as "this line is wrong". That only ever starts an
+-- argument; a counter-proposal starts a negotiation, and is the thing a rep can
+-- actually accept. These columns turn a flag into a redline: the words to use
+-- instead, which side raised it, where it got to, and the conversation under it.
+alter table public.flags add column if not exists proposed text;
+-- The whole line the quote came from. A three-word quote can occur in several
+-- places on the page; without this, one mark strikes all of them and accepting
+-- rewrites whichever the walker reached first.
+alter table public.flags add column if not exists context text not null default '';
+alter table public.flags add column if not exists side    text not null default 'them';
+alter table public.flags add column if not exists status  text not null default 'open';
+alter table public.flags add column if not exists replies jsonb not null default '[]'::jsonb;
+
+alter table public.flags drop constraint if exists flags_side_check;
+alter table public.flags add  constraint flags_side_check check (side in ('us', 'them'));
+alter table public.flags drop constraint if exists flags_status_check;
+alter table public.flags add  constraint flags_status_check
+  check (status in ('open', 'accepted', 'rejected'));
+
+-- Rows raised before this existed were resolved-or-not, which maps onto the
+-- accepted-or-open half of the new state.
+update public.flags set status = 'accepted' where resolved and status = 'open';
+
+-- Replaces the three-argument version: a redline can now carry the wording it
+-- proposes. Dropped explicitly because changing the signature leaves the old
+-- overload callable, and an anon caller could keep reaching the version that
+-- silently discards the proposal.
+drop function if exists public.add_shared_flag(text, text, text);
+drop function if exists public.add_shared_flag(text, text, text, text);
+create or replace function public.add_shared_flag(
+  p_token text, p_quote text, p_note text, p_proposed text default null,
+  p_context text default ''
+)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_link public.share_links; v_row public.flags;
+begin
+  v_link := public.resolve_share(p_token);
+  if v_link.token is null then raise exception 'invalid or expired link'; end if;
+  -- A bare strike-through says nothing. Either say what it should say, or say
+  -- why — one of the two has to be there for the mark to be worth anything.
+  if btrim(coalesce(p_note, '')) = '' and btrim(coalesce(p_proposed, '')) = '' then
+    raise exception 'a note or a proposal is required';
+  end if;
+
+  insert into public.flags (room_id, share_token, quote, context, note, proposed, by_name, side, status)
+  values (v_link.room_id, p_token, left(btrim(p_quote), 240), left(btrim(coalesce(p_context, '')), 2000),
+          btrim(coalesce(p_note, '')), nullif(btrim(coalesce(p_proposed, '')), ''),
+          coalesce(nullif(btrim(coalesce(v_link.recipient_name, '')), ''), 'The counterparty'),
+          'them', 'open')
+  returning * into v_row;
+
+  return jsonb_build_object('id', v_row.id, 'quote', v_row.quote, 'note', v_row.note,
+                            'proposed', v_row.proposed, 'context', v_row.context, 'by', v_row.by_name, 'at', v_row.at,
+                            'side', v_row.side, 'status', v_row.status, 'replies', v_row.replies);
+end;
+$$;
+
+-- The counterparty answering the rep. Without this the thread is one-way and
+-- the whole thing is a suggestion box again.
+create or replace function public.reply_shared_flag(p_token text, p_flag uuid, p_text text)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_link public.share_links; v_row public.flags; v_reply jsonb;
+begin
+  v_link := public.resolve_share(p_token);
+  if v_link.token is null then raise exception 'invalid or expired link'; end if;
+  if btrim(coalesce(p_text, '')) = '' then raise exception 'empty reply'; end if;
+
+  v_reply := jsonb_build_object(
+    'id', gen_random_uuid(), 'side', 'them', 'text', btrim(p_text),
+    'by', coalesce(nullif(btrim(coalesce(v_link.recipient_name, '')), ''), 'The counterparty'),
+    'at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+
+  -- Scoped to the room behind the token, so a valid link can't be used to
+  -- append to another room's thread by guessing a flag id.
+  update public.flags set replies = replies || v_reply
+   where id = p_flag and room_id = v_link.room_id
+  returning * into v_row;
+  if v_row.id is null then raise exception 'no such mark on this page'; end if;
+
+  return v_reply;
+end;
+$$;
+
+grant execute on function public.add_shared_flag(text, text, text, text, text) to anon, authenticated;
+grant execute on function public.reply_shared_flag(text, uuid, text)     to anon, authenticated;

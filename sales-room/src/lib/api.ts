@@ -1,6 +1,13 @@
 import { normaliseContent } from "./roomStore";
+import { normaliseFlag } from "./redline";
 import { requireSupabase } from "./supabase";
-import type { FlaggedPassage, Room, RoomFeedback, Verdict } from "../types";
+import type {
+  FlaggedPassage,
+  RedlineReply,
+  Room,
+  RoomFeedback,
+  Verdict,
+} from "../types";
 
 /* ------------------------------------------------------------ rep-side API */
 
@@ -37,7 +44,11 @@ export interface ShareLink {
 const ROOM_COLUMNS =
   "id, kind, room_mode, status, name, account, content, sources, documents, videos, library, curated_video_ids, updated_at";
 
-function toRoom(row: RoomRow, feedback: RoomFeedback | null, flags: FlaggedPassage[]): Room {
+function toRoom(
+  row: RoomRow,
+  feedback: RoomFeedback | null,
+  flags: FlaggedPassage[],
+): Room {
   return {
     id: row.id,
     kind: row.kind,
@@ -63,10 +74,21 @@ function toRoom(row: RoomRow, feedback: RoomFeedback | null, flags: FlaggedPassa
 export async function fetchRooms(): Promise<Room[]> {
   const db = requireSupabase();
   const [rooms, feedback, flags, opens] = await Promise.all([
-    db.from("rooms").select(ROOM_COLUMNS).order("updated_at", { ascending: false }),
+    db
+      .from("rooms")
+      .select(ROOM_COLUMNS)
+      .order("updated_at", { ascending: false }),
     db.from("feedback").select("room_id, verdict, message, by_name, at"),
-    db.from("flags").select("id, room_id, quote, note, by_name, at, resolved").order("at"),
-    db.from("share_links").select("room_id, last_opened_at").not("last_opened_at", "is", null),
+    db
+      .from("flags")
+      .select(
+        "id, room_id, quote, context, proposed, note, by_name, at, resolved, side, status, replies",
+      )
+      .order("at"),
+    db
+      .from("share_links")
+      .select("room_id, last_opened_at")
+      .not("last_opened_at", "is", null),
   ]);
   for (const r of [rooms, feedback, flags, opens]) if (r.error) throw r.error;
 
@@ -82,14 +104,15 @@ export async function fetchRooms(): Promise<Room[]> {
   const flagsByRoom = new Map<string, FlaggedPassage[]>();
   for (const f of flags.data ?? []) {
     const list = flagsByRoom.get(f.room_id) ?? [];
-    list.push({ id: f.id, quote: f.quote, note: f.note, by: f.by_name, at: f.at, resolved: f.resolved });
+    list.push(normaliseFlag({ ...f, by: f.by_name }));
     flagsByRoom.set(f.room_id, list);
   }
   // Most recent open across a room's links stands in for "last viewed".
   const openByRoom = new Map<string, string>();
   for (const o of opens.data ?? []) {
     const prev = openByRoom.get(o.room_id);
-    if (!prev || o.last_opened_at > prev) openByRoom.set(o.room_id, o.last_opened_at);
+    if (!prev || o.last_opened_at > prev)
+      openByRoom.set(o.room_id, o.last_opened_at);
   }
 
   return (rooms.data ?? []).map((row) => {
@@ -138,8 +161,14 @@ export async function deleteRoom(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function setFlagResolved(id: string, resolved: boolean): Promise<void> {
-  const { error } = await requireSupabase().from("flags").update({ resolved }).eq("id", id);
+export async function setFlagResolved(
+  id: string,
+  resolved: boolean,
+): Promise<void> {
+  const { error } = await requireSupabase()
+    .from("flags")
+    .update({ resolved })
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -227,12 +256,22 @@ export interface SharedRoomPayload {
   recipientName: string | null;
   feedback: RoomFeedback | null;
   flags: FlaggedPassage[];
-  assets: { id: string; name: string; kind: string; thumbnail: string | null; url?: string }[];
+  assets: {
+    id: string;
+    name: string;
+    kind: string;
+    thumbnail: string | null;
+    url?: string;
+  }[];
 }
 
 /** Null means the link is unknown, revoked, expired, or the room isn't live. */
-export async function fetchSharedRoom(token: string): Promise<SharedRoomPayload | null> {
-  const { data, error } = await requireSupabase().rpc("get_shared_room", { p_token: token });
+export async function fetchSharedRoom(
+  token: string,
+): Promise<SharedRoomPayload | null> {
+  const { data, error } = await requireSupabase().rpc("get_shared_room", {
+    p_token: token,
+  });
   if (error) throw error;
   return (data as SharedRoomPayload | null) ?? null;
 }
@@ -251,7 +290,9 @@ export async function submitSharedFeedback(
 }
 
 export async function withdrawSharedFeedback(token: string): Promise<void> {
-  const { error } = await requireSupabase().rpc("withdraw_shared_feedback", { p_token: token });
+  const { error } = await requireSupabase().rpc("withdraw_shared_feedback", {
+    p_token: token,
+  });
   if (error) throw error;
 }
 
@@ -259,14 +300,33 @@ export async function addSharedFlag(
   token: string,
   quote: string,
   note: string,
+  proposed: string | null = null,
+  context = "",
 ): Promise<FlaggedPassage> {
   const { data, error } = await requireSupabase().rpc("add_shared_flag", {
     p_token: token,
     p_quote: quote,
     p_note: note,
+    p_proposed: proposed,
+    p_context: context,
   });
   if (error) throw error;
-  return data as FlaggedPassage;
+  return normaliseFlag(data as Record<string, unknown>);
+}
+
+/** The counterparty answering a thread on their own copy of the page. */
+export async function replyToSharedFlag(
+  token: string,
+  flagId: string,
+  text: string,
+): Promise<RedlineReply> {
+  const { data, error } = await requireSupabase().rpc("reply_shared_flag", {
+    p_token: token,
+    p_flag: flagId,
+    p_text: text,
+  });
+  if (error) throw error;
+  return data as RedlineReply;
 }
 
 /* -------------------------------------------------------------- playbook */
@@ -283,7 +343,11 @@ export interface Playbook {
   avoid: string;
 }
 
-export const EMPTY_PLAYBOOK: Playbook = { principles: "", exemplar: "", avoid: "" };
+export const EMPTY_PLAYBOOK: Playbook = {
+  principles: "",
+  exemplar: "",
+  avoid: "",
+};
 
 export async function fetchPlaybook(): Promise<Playbook> {
   const { data, error } = await requireSupabase()
@@ -299,5 +363,20 @@ export async function savePlaybook(next: Playbook): Promise<void> {
   const { error } = await requireSupabase()
     .from("playbook")
     .upsert({ id: true, ...next, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+/** Writes back the parts of a redline that change after it is raised. */
+export async function updateFlag(
+  id: string,
+  patch: {
+    status?: FlaggedPassage["status"];
+    replies?: FlaggedPassage["replies"];
+  },
+): Promise<void> {
+  const { error } = await requireSupabase()
+    .from("flags")
+    .update(patch)
+    .eq("id", id);
   if (error) throw error;
 }

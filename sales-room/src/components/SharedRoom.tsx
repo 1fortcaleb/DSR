@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { errText } from "../lib/errors";
 import {
   addSharedFlag,
+  replyToSharedFlag,
   fetchSharedRoom,
   submitSharedFeedback,
   withdrawSharedFeedback,
   type SharedRoomPayload,
 } from "../lib/api";
 import { RoomsContext, type RoomsContextValue } from "../context/RoomsContext";
-import { AssetsContext, type AssetsContextValue } from "../context/AssetsContext";
+import {
+  AssetsContext,
+  type AssetsContextValue,
+} from "../context/AssetsContext";
 import { isCloud } from "../lib/supabase";
 import { vocabularyFor } from "../lib/vocabulary";
 import type { Asset, AssetKind, FlaggedPassage, Room, Verdict } from "../types";
@@ -29,7 +33,9 @@ type SharedTab = "case" | "files" | "videos";
  */
 export function SharedRoom({ token }: { token: string }) {
   const [payload, setPayload] = useState<SharedRoomPayload | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "gone" | "error" | "unconfigured">("loading");
+  const [state, setState] = useState<
+    "loading" | "ready" | "gone" | "error" | "unconfigured"
+  >("loading");
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<SharedTab>("case");
   const loaded = useRef(false);
@@ -88,14 +94,33 @@ export function SharedRoom({ token }: { token: string }) {
   }, [token]);
 
   const flagPassage = useCallback(
-    (quote: string, note: string) => {
-      void addSharedFlag(token, quote, note)
+    (quote: string, note: string, proposed?: string | null, context = "") => {
+      void addSharedFlag(token, quote, note, proposed ?? null, context)
         .then((flag: FlaggedPassage) =>
           setPayload((p) => (p ? { ...p, flags: [...p.flags, flag] } : p)),
         )
-        .catch((err: unknown) =>
-          setError(errText(err)),
-        );
+        .catch((err: unknown) => setError(errText(err)));
+    },
+    [token],
+  );
+
+  /** Their side of a thread. Optimistic, so the reply appears as they send it. */
+  const replyToRedline = useCallback(
+    (id: string, text: string) => {
+      void replyToSharedFlag(token, id, text)
+        .then((reply) =>
+          setPayload((p) =>
+            p
+              ? {
+                  ...p,
+                  flags: p.flags.map((f) =>
+                    f.id === id ? { ...f, replies: [...f.replies, reply] } : f,
+                  ),
+                }
+              : p,
+          ),
+        )
+        .catch((err: unknown) => setError(errText(err)));
     },
     [token],
   );
@@ -145,6 +170,12 @@ export function SharedRoom({ token }: { token: string }) {
       submitFeedback,
       withdrawFeedback,
       flagPassage,
+      // The counterparty proposes and replies; accepting is the rep's call,
+      // and marking as "us" from this side would forge the other party.
+      markPassage: noop,
+      replyToRedline,
+      acceptRedline: noop,
+      rejectRedline: noop,
       resolveFlag: noop,
       removeFlag: noop,
       status: "idle",
@@ -155,7 +186,7 @@ export function SharedRoom({ token }: { token: string }) {
       dismissError: noop,
       resetAll: noop,
     };
-  }, [payload, submitFeedback, withdrawFeedback, flagPassage]);
+  }, [payload, submitFeedback, withdrawFeedback, flagPassage, replyToRedline]);
 
   /* The counterparty's asset context: read-only, and only the assets their own
      room references. Every one already carries a hosted URL, so nothing here
@@ -195,7 +226,11 @@ export function SharedRoom({ token }: { token: string }) {
   }, [payload?.assets]);
 
   if (state === "loading") {
-    return <Shell><p className="m-0 text-[13px] text-muted">Opening…</p></Shell>;
+    return (
+      <Shell>
+        <p className="m-0 text-[13px] text-muted">Opening…</p>
+      </Shell>
+    );
   }
 
   if (state === "unconfigured") {
@@ -205,8 +240,9 @@ export function SharedRoom({ token }: { token: string }) {
           No backend configured.
         </h1>
         <p className="m-0 max-w-[34em] text-[13.5px] leading-[1.6] text-muted">
-          This build runs against browser storage, so share links resolve to nothing. Set
-          VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY and run supabase/schema.sql.
+          This build runs against browser storage, so share links resolve to
+          nothing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY and run
+          supabase/schema.sql.
         </p>
       </Shell>
     );
@@ -219,8 +255,8 @@ export function SharedRoom({ token }: { token: string }) {
           This link isn't active.
         </h1>
         <p className="m-0 max-w-[34em] text-[13.5px] leading-[1.6] text-muted">
-          It may have expired, been replaced, or the room isn't published yet. Ask your contact at
-          1Fort for a fresh link.
+          It may have expired, been replaced, or the room isn't published yet.
+          Ask your contact at 1Fort for a fresh link.
         </p>
       </Shell>
     );
@@ -232,7 +268,9 @@ export function SharedRoom({ token }: { token: string }) {
         <h1 className="m-0 text-[22px] font-bold tracking-[-0.02em] text-navy">
           Something went wrong.
         </h1>
-        <p className="m-0 max-w-[34em] text-[13.5px] leading-[1.6] text-muted">{error}</p>
+        <p className="m-0 max-w-[34em] text-[13.5px] leading-[1.6] text-muted">
+          {error}
+        </p>
       </Shell>
     );
   }
@@ -243,8 +281,12 @@ export function SharedRoom({ token }: { token: string }) {
   const videoCount = value.activeRoom.curatedVideoIds.length;
   const tabs: { id: SharedTab; label: string; count?: number }[] = [
     { id: "case", label: "Business case" },
-    ...(docCount ? [{ id: "files" as const, label: "Documents", count: docCount }] : []),
-    ...(videoCount ? [{ id: "videos" as const, label: "Video answers", count: videoCount }] : []),
+    ...(docCount
+      ? [{ id: "files" as const, label: "Documents", count: docCount }]
+      : []),
+    ...(videoCount
+      ? [{ id: "videos" as const, label: "Video answers", count: videoCount }]
+      : []),
   ];
   const active: SharedTab = tabs.some((t) => t.id === tab) ? tab : "case";
 
@@ -305,7 +347,11 @@ export function SharedRoom({ token }: { token: string }) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-panel px-6 text-center">
-      <img src={wordmark} alt="1Fort AI" className="mb-2 h-[14px] w-auto invert" />
+      <img
+        src={wordmark}
+        alt="1Fort AI"
+        className="mb-2 h-[14px] w-auto invert"
+      />
       {children}
     </div>
   );
