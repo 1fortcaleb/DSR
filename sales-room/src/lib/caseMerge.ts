@@ -12,15 +12,25 @@ import type { CaseContent, CaseStakeholder } from "../types";
 export function mergeCase(current: CaseContent, next: Partial<CaseContent>): CaseContent {
   const byId = <T extends { id: string }>(mine: T[], theirs: unknown): T[] => {
     if (!Array.isArray(theirs)) return mine;
-    const found = new Map(
-      theirs
-        .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
-        .map((t) => [String(t.id), t]),
+    const items = theirs.filter(
+      (t): t is Record<string, unknown> => !!t && typeof t === "object",
     );
+    const found = new Map(items.map((t) => [String(t.id), t]));
+
+    // The prompt asks for the ids back verbatim, and matching on them is what
+    // keeps the rep's edit handles and the counterparty's marks pointing at the
+    // same lines. But a model that renames them would otherwise have its entire
+    // answer discarded in silence — the page would come back from a generation
+    // looking exactly as it went in, with nothing to indicate why. When not one
+    // id lines up, treat the reply as the same list in the same order and match
+    // by position instead.
+    const anyMatched = mine.some((item) => found.has(item.id));
+    const positional = !anyMatched && items.length > 0;
+
     // Driven by the current list, so the page keeps its own length and order
     // however many items came back.
-    return mine.map((item) => {
-      const replacement = found.get(item.id);
+    return mine.map((item, i) => {
+      const replacement = positional ? items[i] : found.get(item.id);
       if (!replacement) return item;
       const kept: Record<string, unknown> = { ...item };
       // A blank string is the model declining to fill a slot, not an edit.
