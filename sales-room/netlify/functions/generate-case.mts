@@ -25,14 +25,15 @@ const MODEL = "claude-opus-5";
  *    notes that are already in front of the model. It is not a problem that
  *    rewards long deliberation, and at the default effort most of the wall
  *    clock was going on thinking nobody reads.
- *  - fast mode. The same model, generating output tokens substantially faster,
- *    at premium pricing. A page costs cents. A page that never arrives costs
- *    the rep the meeting.
  *  - streaming. Bytes keep moving while the model works, so nothing between
  *    here and Anthropic decides the request has stalled.
+ *
+ * Fast mode was the obvious third lever and it is not available: this
+ * organisation's quota is a hard zero, so every request spent a wasted
+ * round-trip being refused before falling back. Do not put it back without
+ * checking `anthropic-fast-input-tokens-limit` on a live response first.
  */
 const EFFORT = "medium" as const;
-const FAST_MODE_BETA = "fast-mode-2026-02-01";
 
 /* ------------------------------------------------------------------ schema */
 
@@ -232,9 +233,8 @@ async function callerIsSignedIn(token: string | null): Promise<boolean> {
 
 /* ------------------------------------------------------------------- model */
 
-/** One attempt at the page. `fast` is the only thing that varies. */
-function write(client: Anthropic, body: Body, fast: boolean) {
-  return client.beta.messages
+function write(client: Anthropic, body: Body) {
+  return client.messages
     .stream({
       model: MODEL,
       max_tokens: 16000,
@@ -245,7 +245,6 @@ function write(client: Anthropic, body: Body, fast: boolean) {
         format: { type: "json_schema", schema: CASE_SCHEMA },
       },
       messages: [{ role: "user", content: buildPrompt(body) }],
-      ...(fast ? { speed: "fast" as const, betas: [FAST_MODE_BETA] } : {}),
     })
     .finalMessage();
 }
@@ -287,29 +286,12 @@ export default async function handler(req: Request, _context: Context) {
   }
 
   try {
-    // One retry rather than the SDK's default of two: every attempt spends
-    // seconds we do not have, and this function has its own fallback below
-    // which is a better use of them than waiting on the same capacity twice.
+    // One retry rather than the SDK's default of two. A second retry would
+    // land well past Netlify's ceiling, so it can only turn a clear error into
+    // a cut-off one.
     const client = new Anthropic({ apiKey, maxRetries: 1 });
     const started = Date.now();
-
-    let message;
-    try {
-      message = await write(client, body, true);
-    } catch (err) {
-      // Fast mode is a beta, a per-model capability, and served from its own
-      // pool of premium capacity — so it can be rejected outright (400) or be
-      // busy when standard capacity is not (429). Neither should be the
-      // difference between a page and an error message: drop back to standard
-      // speed and take the extra seconds.
-      const status = (err as { status?: number }).status;
-      if (status === 400 || status === 429) {
-        console.warn(`fast mode unavailable (${status}), retrying at standard speed:`, err);
-        message = await write(client, body, false);
-      } else {
-        throw err;
-      }
-    }
+    const message = await write(client, body);
 
     // The one number worth having in the log: how close this ran to Netlify's
     // ceiling. If it creeps back up, generation moves to a background function.
