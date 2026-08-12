@@ -123,6 +123,8 @@ The same applies to claims, not only figures. "Producers rekey every submission"
 
 **framing** — five clauses, in order: despite / you still can't / which means / have to / and the cost is. Each 'value' is the bracketed part, and it should read as their situation described back to them, specific enough that a competitor's prospect would not recognise themselves in it. Keep the 'lead' text exactly as given; you are writing only the values.
 
+Keep each value short: about 45 characters, and never more than 60. It is set large, in monospace, on a narrow column, and the five clauses are meant to be read as a ladder of five lines. A value that needs a comma and a second half is two ideas, and the second one belongs in the approach or the outcomes rather than here.
+
 **stats** — up to four figures from the sources, chosen because they carry the argument, not because they are the four you found. 'value' is the number as written ("11.5", "$1.4M", "1 in 3"), 'unit' is the trailing word if there is one ("days", "portals") and empty otherwise. 'label' says what the figure measures, in the fewest words that stay unambiguous. Use accent "red" for a figure that represents loss or delay, "navy" otherwise. Leave any stat you cannot source exactly as it came to you.
 
 **approachBody and approachBullets** — the recommended approach: what you are proposing to *do* about the problem. A commitment, not a description of a product. "Put your two highest-volume producers on it for one line of business" is an approach; "1Fort streamlines submissions" is a brochure. Three bullets at most.

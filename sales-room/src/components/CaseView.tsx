@@ -86,9 +86,18 @@ export function CaseView({ audience }: CaseViewProps) {
               ariaLabel="Problem framing label"
               className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase"
             />
-            <div className="flex flex-col gap-0.5 whitespace-nowrap font-mono text-[21px] leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase">
+            {/*
+              The ladder is designed as five one-line clauses, and it reads best
+              when each stays on its line — but "stays on its line" cannot be
+              enforced by refusing to wrap. A value longer than the column then
+              runs off the page and out of the PDF, which is how a rep sends a
+              one-pager with half a sentence missing and never sees it. So it
+              wraps, and a hanging indent makes a wrapped clause read as the
+              continuation it is rather than as a sixth line of the ladder.
+            */}
+            <div className="flex flex-col gap-0.5 font-mono text-[21px] leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase">
               {content.framing.map((line) => (
-                <div key={line.id}>
+                <div key={line.id} className="pl-[1.4em] indent-[-1.4em] break-words">
                   <EditableText
                     readOnly={ro}
                     value={line.lead}
