@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRooms } from "../../context/RoomsContext";
 import { isEmptyParse, parseNotes, RULE, type ParsedNotes, type ParsedNumber } from "../../lib/granola";
 import { CheckIcon } from "../icons";
@@ -62,13 +62,32 @@ interface Change {
  * the original.
  */
 export function NotesImport() {
-  const { activeRoom, updateRoom, setField, setListItem, renameSource, regenerate, status } =
+  const { activeRoom, updateRoom, setField, setListItem, renameSource, regenerate, status, error } =
     useRooms();
   const { content, account } = activeRoom;
   const [text, setText] = useState("");
   const [overwrite, setOverwrite] = useState(false);
   /** null until the rep runs it; an empty array means "nothing was eligible". */
   const [applied, setApplied] = useState<string[] | null>(null);
+  /** Set on apply; cleared once the notes are genuinely on the room. */
+  const [wantsGeneration, setWantsGeneration] = useState(false);
+
+  /**
+   * Waits for the source to exist before generating.
+   *
+   * Saving the notes is a state update, so firing the generation straight after
+   * calling it — even on a timer — can run against a room that does not have
+   * them yet. The generation then refuses for want of sources, which is correct
+   * and completely invisible: nothing reaches the server, so there is no log to
+   * find either. Watching for the source removes the race instead of narrowing
+   * the window.
+   */
+  useEffect(() => {
+    if (!wantsGeneration) return;
+    if (!activeRoom.sources.some((s) => s.used && s.text?.trim())) return;
+    setWantsGeneration(false);
+    regenerate();
+  }, [wantsGeneration, activeRoom.sources, regenerate]);
 
   const parsed: ParsedNotes | null = useMemo(
     () => (text.trim().length > 20 ? parseNotes(text) : null),
@@ -257,8 +276,7 @@ export function NotesImport() {
     for (const change of willChange) change.apply();
     keepAsSource();
     setApplied(willChange.map((c) => c.label));
-    // After the source lands on the room, so the generation can read it.
-    setTimeout(regenerate, 0);
+    setWantsGeneration(true);
   }
 
   /** Keeps the notes on the room so a later regeneration can draw on them. */
@@ -397,11 +415,17 @@ export function NotesImport() {
                 {/* The parser's half is the boring half. Say that the writing
                     is now happening, so a page that still reads like a template
                     is understood as "not finished yet" rather than "broken". */}
-                <p className="m-0 text-[11.5px] leading-[1.5] text-muted">
-                  {status === "working"
-                    ? "Writing the page from these notes — the headline and problem framing take about half a minute."
-                    : "Writing the page from these notes. Open Business case when it finishes."}
-                </p>
+                {error ? (
+                  <p className="m-0 rounded-md bg-red/10 px-3 py-2 text-[11.5px] leading-[1.5] text-red">
+                    {error}
+                  </p>
+                ) : (
+                  <p className="m-0 text-[11.5px] leading-[1.5] text-muted">
+                    {status === "working"
+                      ? "Writing the page from these notes — this takes about half a minute."
+                      : "Written. Open Business case to read it."}
+                  </p>
+                )}
               </div>
             )}
           </>
