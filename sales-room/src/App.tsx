@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { CaseView } from "./components/CaseView";
 import { FilesView } from "./components/FilesView";
@@ -22,6 +22,13 @@ function Room() {
   const [audience, setAudience] = useState<Audience>("rep");
   const [view, setView] = useState<RoomView>("case");
   const { activeRoom } = useRooms();
+
+  // A rep works several deals at once, and browser tabs are how they tell one
+  // window from another. Naming the counterparty is the only thing that makes
+  // four identical tabs distinguishable.
+  useEffect(() => {
+    document.title = `${activeRoom.account.company} · 1Fort AI`;
+  }, [activeRoom.account.company]);
 
   // The CMS is rep-only; flipping to the counterparty view leaves it.
   const effectiveView: RoomView = audience === "buyer" && view === "manage" ? "case" : view;
