@@ -16,6 +16,24 @@ import type { Context } from "@netlify/functions";
 
 const MODEL = "claude-opus-5";
 
+/**
+ * Netlify kills a synchronous function when it runs past its execution ceiling,
+ * and the rep sees "the generation ran too long and was cut off" — true, and
+ * useless to them. Three things keep the call comfortably inside it:
+ *
+ *  - effort "medium". This is a rewrite of a page that already exists, against
+ *    notes that are already in front of the model. It is not a problem that
+ *    rewards long deliberation, and at the default effort most of the wall
+ *    clock was going on thinking nobody reads.
+ *  - fast mode. The same model, generating output tokens substantially faster,
+ *    at premium pricing. A page costs cents. A page that never arrives costs
+ *    the rep the meeting.
+ *  - streaming. Bytes keep moving while the model works, so nothing between
+ *    here and Anthropic decides the request has stalled.
+ */
+const EFFORT = "medium" as const;
+const FAST_MODE_BETA = "fast-mode-2026-02-01";
+
 /* ------------------------------------------------------------------ schema */
 
 const text = { type: "string" } as const;
@@ -212,6 +230,26 @@ async function callerIsSignedIn(token: string | null): Promise<boolean> {
   }
 }
 
+/* ------------------------------------------------------------------- model */
+
+/** One attempt at the page. `fast` is the only thing that varies. */
+function write(client: Anthropic, body: Body, fast: boolean) {
+  return client.beta.messages
+    .stream({
+      model: MODEL,
+      max_tokens: 16000,
+      system: SYSTEM,
+      thinking: { type: "adaptive" },
+      output_config: {
+        effort: EFFORT,
+        format: { type: "json_schema", schema: CASE_SCHEMA },
+      },
+      messages: [{ role: "user", content: buildPrompt(body) }],
+      ...(fast ? { speed: "fast" as const, betas: [FAST_MODE_BETA] } : {}),
+    })
+    .finalMessage();
+}
+
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
@@ -250,14 +288,31 @@ export default async function handler(req: Request, _context: Context) {
 
   try {
     const client = new Anthropic({ apiKey });
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM,
-      thinking: { type: "adaptive" },
-      output_config: { format: { type: "json_schema", schema: CASE_SCHEMA } },
-      messages: [{ role: "user", content: buildPrompt(body) }],
-    });
+    const started = Date.now();
+
+    let message;
+    try {
+      message = await write(client, body, true);
+    } catch (err) {
+      // Fast mode is a beta and a per-model capability, so an invalid
+      // combination is rejected when the request is created. That must never
+      // be the difference between a page and an error message: drop back to
+      // standard speed and take the extra seconds.
+      if ((err as { status?: number }).status === 400) {
+        console.warn("fast mode was rejected, retrying at standard speed:", err);
+        message = await write(client, body, false);
+      } else {
+        throw err;
+      }
+    }
+
+    // The one number worth having in the log: how close this ran to Netlify's
+    // ceiling. If it creeps back up, generation moves to a background function.
+    console.log(
+      `generate-case: ${Date.now() - started}ms, ` +
+        `${message.usage.output_tokens} output tokens ` +
+        `(${message.usage.output_tokens_details?.thinking_tokens ?? 0} thinking)`,
+    );
 
     // Safety classifiers can decline a request; that arrives as a 200 with an
     // empty body, so reading content[0] first would throw on undefined.
