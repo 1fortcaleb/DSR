@@ -287,19 +287,24 @@ export default async function handler(req: Request, _context: Context) {
   }
 
   try {
-    const client = new Anthropic({ apiKey });
+    // One retry rather than the SDK's default of two: every attempt spends
+    // seconds we do not have, and this function has its own fallback below
+    // which is a better use of them than waiting on the same capacity twice.
+    const client = new Anthropic({ apiKey, maxRetries: 1 });
     const started = Date.now();
 
     let message;
     try {
       message = await write(client, body, true);
     } catch (err) {
-      // Fast mode is a beta and a per-model capability, so an invalid
-      // combination is rejected when the request is created. That must never
-      // be the difference between a page and an error message: drop back to
-      // standard speed and take the extra seconds.
-      if ((err as { status?: number }).status === 400) {
-        console.warn("fast mode was rejected, retrying at standard speed:", err);
+      // Fast mode is a beta, a per-model capability, and served from its own
+      // pool of premium capacity — so it can be rejected outright (400) or be
+      // busy when standard capacity is not (429). Neither should be the
+      // difference between a page and an error message: drop back to standard
+      // speed and take the extra seconds.
+      const status = (err as { status?: number }).status;
+      if (status === 400 || status === 429) {
+        console.warn(`fast mode unavailable (${status}), retrying at standard speed:`, err);
         message = await write(client, body, false);
       } else {
         throw err;
