@@ -526,6 +526,27 @@ export function DocumentsEditor() {
               assetId={d.assetId}
               onChange={(assetId) => patchDoc(d.id, { assetId })}
             />
+            {/*
+              Attaching a document used to be the same act as sending it. This
+              is the only way to keep one in the room without it travelling —
+              a rate card, a signed order form, a security questionnaire you're
+              working from but haven't answered yet.
+            */}
+            <label className="flex cursor-pointer items-start gap-2 text-[12.5px] leading-[1.5] text-body">
+              <input
+                type="checkbox"
+                checked={d.internal === true}
+                onChange={(e) => patchDoc(d.id, { internal: e.target.checked })}
+                className="mt-0.5 cursor-pointer accent-blue"
+              />
+              <span>
+                Keep this one internal
+                <span className="block text-[11.5px] text-muted">
+                  Stays in the room for your team. Neither the document nor the file behind it is
+                  sent to {activeRoom.account.company || "the counterparty"}.
+                </span>
+              </span>
+            </label>
           </ListRow>
         ))}
       </div>

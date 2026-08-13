@@ -19,7 +19,13 @@ export function FilesView({ audience }: FilesViewProps) {
   const isRep = audience === "rep";
   const { activeRoom } = useRooms();
   const { byId: assetsById } = useAssets();
-  const documents = activeRoom.documents;
+  // The buyer toggle says "exactly what Priya sees when they open the link",
+  // and a preview that shows a document the real link withholds is a preview
+  // that lies about the one thing it exists to answer. The server enforces
+  // this for the actual recipient; this is what makes the rehearsal honest.
+  const documents = isRep
+    ? activeRoom.documents
+    : activeRoom.documents.filter((d) => !d.internal);
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = documents.find((d) => d.id === activeId) ?? documents[0];
 
@@ -92,7 +98,19 @@ export function FilesView({ audience }: FilesViewProps) {
                         >
                           {file.name}
                         </span>
-                        <span className="text-[11px] text-faint">{file.meta}</span>
+                        <span className="text-[11px] text-faint">
+                          {file.meta}
+                          {/* Said here as well as in Manage: whether a document
+                              travels is the kind of thing a rep should be able
+                              to see while looking at the room, not only while
+                              editing it. The buyer view never renders these
+                              rows at all, so the badge cannot appear to them. */}
+                          {file.internal && (
+                            <span className="ml-1.5 font-mono text-[9.5px] tracking-[0.08em] text-red uppercase">
+                              Internal
+                            </span>
+                          )}
+                        </span>
                       </span>
                       <span
                         className={`h-1.5 w-1.5 flex-none rounded-full ${file.unread ? "bg-blue" : "bg-transparent"}`}

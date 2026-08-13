@@ -180,6 +180,7 @@ declare
   v_link public.share_links;
   v_room public.rooms;
   v_videos jsonb;
+  v_documents jsonb;
   v_asset_ids text[];
 begin
   v_link := public.resolve_share(p_token);
@@ -204,9 +205,18 @@ begin
      select jsonb_array_elements_text(coalesce(v_room.curated_video_ids, '[]'::jsonb))
    );
 
-  -- Only the assets this room actually references are exposed.
+  -- A document marked internal is held back, and so is the file behind it: a
+  -- row the recipient cannot see is still a URL they could be handed. Opt-out,
+  -- so a room that predates the flag keeps sending exactly what it sent before.
+  select coalesce(jsonb_agg(d), '[]'::jsonb) into v_documents
+    from jsonb_array_elements(coalesce(v_room.documents, '[]'::jsonb)) d
+   where coalesce((d ->> 'internal')::boolean, false) = false;
+
+  -- Only the assets this room actually references are exposed. Read from the
+  -- filtered lists above, never the raw ones, or a withheld document's file
+  -- travels in the payload anyway.
   select array_agg(distinct x) into v_asset_ids from (
-    select jsonb_array_elements(v_room.documents) ->> 'assetId' as x
+    select jsonb_array_elements(v_documents) ->> 'assetId' as x
     union all
     select jsonb_array_elements(v_videos) ->> 'posterAssetId'
     union all
@@ -224,7 +234,7 @@ begin
     -- server-side rather than hidden in the client: a hidden field is still in
     -- the response body, and the response body is readable.
     'content',         v_room.content - 'champions' - 'opponents',
-    'documents',       v_room.documents,
+    'documents',       v_documents,
     'videos',          v_videos,
     'curatedVideoIds', v_room.curated_video_ids,
     'recipientName',   v_link.recipient_name,
@@ -233,9 +243,20 @@ begin
                                 'by', f.by_name, 'at', f.at)
         from public.feedback f where f.room_id = v_room.id
     ),
+    -- Only this recipient's own marks. Another recipient's are none of their
+    -- business, and neither are the rep's own annotations on the page.
+    --
+    -- Every column the redlining rework added has to be here or the
+    -- counterparty's half of it silently stops working: without `proposed`
+    -- they see their own suggestion struck through with no replacement, and
+    -- without `replies` the rep's answer never arrives. A thread only one side
+    -- can read is a suggestion box, which is the thing this was built to stop
+    -- being.
     'flags', (
       select coalesce(jsonb_agg(jsonb_build_object(
                'id', fl.id, 'quote', fl.quote, 'note', fl.note,
+               'proposed', fl.proposed, 'context', fl.context,
+               'side', fl.side, 'status', fl.status, 'replies', fl.replies,
                'by', fl.by_name, 'at', fl.at, 'resolved', fl.resolved)), '[]'::jsonb)
         from public.flags fl
        where fl.room_id = v_room.id and fl.share_token = p_token

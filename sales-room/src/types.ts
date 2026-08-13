@@ -45,6 +45,16 @@ export interface RoomDocument {
   id: string;
   /** Backing file in the asset library, if one has been attached. */
   assetId?: string;
+  /**
+   * Kept back from the counterparty.
+   *
+   * Opt-out rather than opt-in, deliberately: every document on every existing
+   * room is one a rep already decided to attach, and a switch to opt-in would
+   * have made all of them vanish from live rooms the moment it deployed.
+   * Enforced server-side, and the file behind it is withheld too — a link the
+   * recipient can't see is still a link they could be sent.
+   */
+  internal?: boolean;
   group: DocGroup;
   ext: DocExt;
   name: string;

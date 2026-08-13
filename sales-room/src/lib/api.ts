@@ -273,7 +273,18 @@ export async function fetchSharedRoom(
     p_token: token,
   });
   if (error) throw error;
-  return (data as SharedRoomPayload | null) ?? null;
+  const payload = (data as SharedRoomPayload | null) ?? null;
+  if (!payload) return null;
+  // Through the same normaliser the rep's own load uses. A mark written before
+  // the page could carry proposals has null where the renderer expects a
+  // string, and the counterparty's view crashing on an old mark is the worst
+  // possible time to find that out.
+  return {
+    ...payload,
+    flags: (payload.flags ?? []).map((f) =>
+      normaliseFlag(f as unknown as Record<string, unknown>),
+    ),
+  };
 }
 
 export async function submitSharedFeedback(
