@@ -1,37 +1,32 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { Context } from "@netlify/functions";
 
 /**
  * Writes the one-pager from the room's sources.
  *
- * This lives on the server for one reason: the Anthropic key must never reach
- * the browser. Anyone can read a bundled key out of the JS, and a key on a
- * public site is a key someone else is spending. The rep's browser sends the
- * sources here; the key never leaves Netlify.
+ * Not an endpoint — it sits in lib/ so the host doesn't route to it. The
+ * endpoint is generate-case-background, which owns the auth gate and the
+ * reporting; this file owns the model.
  *
- * It is also gated. An unauthenticated endpoint that calls a paid model on a
- * public domain gets found and drained, so every request has to carry a live
- * Supabase session belonging to the team.
+ * It runs on the server for one reason: the Anthropic key must never reach the
+ * browser. Anyone can read a bundled key out of the JS, and a key on a public
+ * site is a key someone else is spending.
  */
 
 const MODEL = "claude-opus-5";
 
 /**
- * Netlify kills a synchronous function when it runs past its execution ceiling,
- * and the rep sees "the generation ran too long and was cut off" — true, and
- * useless to them. Three things keep the call comfortably inside it:
+ * Effort "medium" rather than the default.
  *
- *  - effort "medium". This is a rewrite of a page that already exists, against
- *    notes that are already in front of the model. It is not a problem that
- *    rewards long deliberation, and at the default effort most of the wall
- *    clock was going on thinking nobody reads.
- *  - streaming. Bytes keep moving while the model works, so nothing between
- *    here and Anthropic decides the request has stalled.
+ * This is a rewrite of a page that already exists, against notes already in
+ * front of the model. It does not reward long deliberation, and at the default
+ * most of the wall clock went on thinking nobody reads. Since generation moved
+ * to a background task nothing is racing a clock any more, so this is a
+ * judgement about the work rather than a concession to a timeout — but the
+ * judgement holds either way.
  *
- * Fast mode was the obvious third lever and it is not available: this
- * organisation's quota is a hard zero, so every request spent a wasted
- * round-trip being refused before falling back. Do not put it back without
- * checking `anthropic-fast-input-tokens-limit` on a live response first.
+ * Fast mode is not available: this organisation's quota is a hard zero, so
+ * every request spent a guaranteed-refused round-trip. Do not put it back
+ * without checking `anthropic-fast-input-tokens-limit` on a live response.
  */
 const EFFORT = "medium" as const;
 
@@ -145,7 +140,7 @@ Return every id exactly as you received it, and return the same number of items 
 
 Write in plain British-inflected business English. No exclamation marks, no "leverage", no "seamless", no em-dash-joined triplets. Short sentences. The reader is a senior operator who is short of time and has read a hundred of these.`;
 
-interface Body {
+export interface Body {
   account?: string;
   kind?: string;
   mode?: string;
@@ -216,125 +211,75 @@ function buildPrompt(body: Body): string {
   ].join("\n");
 }
 
-/* -------------------------------------------------------------------- auth */
-
-/** A live Supabase session for someone on the team, or nothing. */
-async function callerIsSignedIn(token: string | null): Promise<boolean> {
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const anon = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!token || !url || !anon) return false;
-  try {
-    const res = await fetch(`${url}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${token}`, apikey: anon },
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /* ------------------------------------------------------------------- model */
 
-function write(client: Anthropic, body: Body) {
-  return client.messages
-    .stream({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM,
-      thinking: { type: "adaptive" },
-      output_config: {
-        effort: EFFORT,
-        format: { type: "json_schema", schema: CASE_SCHEMA },
-      },
-      messages: [{ role: "user", content: buildPrompt(body) }],
-    })
-    .finalMessage();
-}
+/** Something the rep can be told, as opposed to a stack trace. */
+export class CaseError extends Error {}
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
+/**
+ * The model call, and the mapping from every way it can go wrong to a sentence
+ * a rep can act on.
+ *
+ * Anything thrown from here is safe to show. Anything else that escapes is a
+ * bug and belongs in the log, not on screen.
+ */
+export async function writeCase(apiKey: string, body: Body): Promise<Record<string, unknown>> {
+  const client = new Anthropic({ apiKey });
+  const started = Date.now();
 
-/* ------------------------------------------------------------------ handler */
-
-export default async function handler(req: Request, _context: Context) {
-  if (req.method !== "POST") return json(405, { error: "POST only." });
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return json(503, {
-      error:
-        "Generation isn't connected yet. Add ANTHROPIC_API_KEY in Netlify under Site configuration → Environment variables, then redeploy.",
-    });
-  }
-
-  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
-  if (!(await callerIsSignedIn(token))) {
-    return json(401, { error: "Sign in again — your session has expired." });
-  }
-
-  let body: Body;
+  let message;
   try {
-    body = (await req.json()) as Body;
-  } catch {
-    return json(400, { error: "Couldn't read that request." });
-  }
-  if (!body.sources?.some((s) => s.text?.trim())) {
-    return json(400, {
-      error: "No sources with any text in them. Paste the call notes first, then regenerate.",
-    });
-  }
-
-  try {
-    // One retry rather than the SDK's default of two. A second retry would
-    // land well past Netlify's ceiling, so it can only turn a clear error into
-    // a cut-off one.
-    const client = new Anthropic({ apiKey, maxRetries: 1 });
-    const started = Date.now();
-    const message = await write(client, body);
-
-    // The one number worth having in the log: how close this ran to Netlify's
-    // ceiling. If it creeps back up, generation moves to a background function.
-    console.log(
-      `generate-case: ${Date.now() - started}ms, ` +
-        `${message.usage.output_tokens} output tokens ` +
-        `(${message.usage.output_tokens_details?.thinking_tokens ?? 0} thinking)`,
-    );
-
-    // Safety classifiers can decline a request; that arrives as a 200 with an
-    // empty body, so reading content[0] first would throw on undefined.
-    if (message.stop_reason === "refusal") {
-      return json(502, {
-        error: "The model declined to write this one. Check the notes for anything sensitive.",
-      });
-    }
-    if (message.stop_reason === "max_tokens") {
-      return json(502, { error: "The reply was cut short. Try again with fewer sources." });
-    }
-
-    const block = message.content.find((b) => b.type === "text");
-    if (!block || block.type !== "text") {
-      return json(502, { error: "The model returned nothing usable." });
-    }
-    return json(200, { content: JSON.parse(block.text) });
+    message = await client.messages
+      .stream({
+        model: MODEL,
+        max_tokens: 16000,
+        system: SYSTEM,
+        thinking: { type: "adaptive" },
+        output_config: {
+          effort: EFFORT,
+          format: { type: "json_schema", schema: CASE_SCHEMA },
+        },
+        messages: [{ role: "user", content: buildPrompt(body) }],
+      })
+      .finalMessage();
   } catch (err) {
-    // The rep gets something they can act on; the detail goes to the Netlify
-    // function log, where an upstream message like "405 Method Not Allowed" is
-    // useful to whoever is debugging and useless on screen.
-    console.error("generate-case failed:", err);
+    console.error("writeCase: the model call failed:", err);
     const status = (err as { status?: number }).status;
     if (status === 401 || status === 403) {
-      return json(502, { error: "Anthropic rejected the API key. Check it in Netlify." });
+      throw new CaseError("Anthropic rejected the API key. Check it in Netlify.");
     }
-    if (status === 429) return json(429, { error: "Rate limited by Anthropic. Try again shortly." });
+    if (status === 429) {
+      throw new CaseError("Anthropic rate limited the request. Try again shortly.");
+    }
     if (status && status >= 500) {
-      return json(502, { error: "Anthropic is having trouble. Try again in a minute." });
+      throw new CaseError("Anthropic is having trouble. Try again in a minute.");
     }
-    return json(502, {
-      error: "Generation failed. The details are in the Netlify function log.",
-    });
+    throw new CaseError("The model call failed. The details are in the function log.");
+  }
+
+  console.log(
+    `writeCase: ${Date.now() - started}ms, ${message.usage.output_tokens} output tokens ` +
+      `(${message.usage.output_tokens_details?.thinking_tokens ?? 0} thinking)`,
+  );
+
+  // A safety classifier can decline, and that arrives as a well-formed response
+  // with nothing in it — so reading content[0] first would throw on undefined.
+  if (message.stop_reason === "refusal") {
+    throw new CaseError(
+      "The model declined to write this one. Check the notes for anything sensitive.",
+    );
+  }
+  if (message.stop_reason === "max_tokens") {
+    throw new CaseError("The reply was cut short. Try again with fewer notes switched on.");
+  }
+
+  const block = message.content.find((b) => b.type === "text");
+  if (!block || block.type !== "text") {
+    throw new CaseError("The model returned nothing usable.");
+  }
+  try {
+    return JSON.parse(block.text) as Record<string, unknown>;
+  } catch {
+    throw new CaseError("The model's answer wasn't readable. Try again.");
   }
 }
-

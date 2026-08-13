@@ -450,6 +450,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
     generationProvider
       .generate({
+        roomId: room.id,
         account: room.account.company,
         kind: room.kind,
         mode: room.mode,

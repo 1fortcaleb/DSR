@@ -548,3 +548,69 @@ $$;
 
 grant execute on function public.add_shared_flag(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.reply_shared_flag(text, uuid, text)     to anon, authenticated;
+
+/* ------------------------------------------------------------ generations */
+
+-- One row per attempt at writing a page.
+--
+-- Generation used to happen inside the HTTP request that asked for it, which
+-- meant it had to finish inside the host's function timeout. It frequently did
+-- not: a real call transcript is long, and the rep got "the generation ran too
+-- long and was cut off" for a request that was working perfectly well and
+-- simply needed another twenty seconds. There is no amount of tuning that
+-- makes an unbounded task fit a bounded request.
+--
+-- So the request now only starts the work. The worker writes its answer here
+-- and the browser watches this row. Nothing is racing a clock.
+create table if not exists public.generations (
+  id           uuid primary key default gen_random_uuid(),
+  room_id      uuid not null references public.rooms(id) on delete cascade,
+  -- Provenance only; access is team-wide like everything else.
+  requested_by uuid references auth.users(id) on delete set null default auth.uid(),
+  status       text not null default 'pending' check (status in ('pending', 'done', 'error')),
+  -- The model's page on success, and the reason on failure. Exactly one of the
+  -- two is set once status leaves 'pending'.
+  content      jsonb,
+  error        text,
+  created_at   timestamptz not null default now(),
+  finished_at  timestamptz
+);
+
+create index if not exists generations_room_idx on public.generations (room_id, created_at desc);
+
+alter table public.generations enable row level security;
+
+-- A share-link visitor has no business here: this is the rep's drafting work,
+-- and the rows hold champions and blockers before they are stripped.
+revoke all on public.generations from anon;
+
+drop policy if exists generations_team_all on public.generations;
+create policy generations_team_all on public.generations
+  for all to authenticated using (true) with check (true);
+
+-- Finished rows are a log nobody reads, and a pending row whose worker died is
+-- a spinner that never stops. Sweeping on insert keeps both bounded without a
+-- scheduler: the table only grows when it is being used, so that is exactly
+-- when it should be tidied.
+create or replace function public.sweep_generations()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.generations
+   where created_at < now() - interval '1 day';
+  -- A worker that never reported back. Fifteen minutes is the host's own
+  -- ceiling for a background task, so past that it is not coming.
+  update public.generations
+     set status = 'error',
+         error = 'The generation stopped without finishing. Try again.',
+         finished_at = now()
+   where status = 'pending'
+     and created_at < now() - interval '15 minutes';
+  return null;
+end;
+$$;
+
+drop trigger if exists sweep_generations on public.generations;
+create trigger sweep_generations
+  after insert on public.generations
+  for each statement execute function public.sweep_generations();
