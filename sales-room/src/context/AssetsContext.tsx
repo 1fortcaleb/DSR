@@ -20,6 +20,7 @@ import {
   listCloudAssets,
   putCloudAsset,
   renameCloudAsset,
+  signCloudAsset,
 } from "../lib/assetCloud";
 import { errText } from "../lib/errors";
 import { isCloud } from "../lib/supabase";
@@ -200,10 +201,15 @@ export function AssetsProvider({ children }: { children: ReactNode }) {
     rename,
     generate,
     openUrl: async (id: string) => {
-      // A hosted asset already has a URL anyone can fetch; only a local-only
-      // one needs a blob handle minting from IndexedDB.
-      const hosted = assets.find((a) => a.id === id)?.url;
-      return hosted ?? (isCloud ? null : assetObjectUrl(id));
+      const asset = assets.find((a) => a.id === id);
+      // Signed at the moment of opening rather than held on the row. The
+      // bucket is private, so there is no URL that keeps working, and one
+      // signed when the library loaded would already be expiring.
+      if (isCloud) {
+        return asset?.storagePath ? await signCloudAsset(asset.storagePath) : null;
+      }
+      // Local-only mode has no Storage at all; the bytes are in IndexedDB.
+      return assetObjectUrl(id);
     },
     clearAll,
     dismissError: () => setError(null),

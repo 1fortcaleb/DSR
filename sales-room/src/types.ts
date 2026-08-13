@@ -344,8 +344,17 @@ export interface Asset {
   sizeBytes: number;
   /** Small data URL used in grids and room tiles; null if none could be made. */
   thumbnail: string | null;
-  /** Hosted URL once the bytes are in Storage. Absent in local-only mode. */
+  /**
+   * A URL that works right now.
+   *
+   * Only ever set where something has just signed one — the counterparty's
+   * view, which is handed a batch of them. The rep's side leaves it unset and
+   * signs on demand from storagePath, because a URL held in state outlives the
+   * hour it was good for.
+   */
   url?: string;
+  /** Object key in Storage. The handle a signed URL is minted from. */
+  storagePath?: string;
   origin: AssetOrigin;
   /** Prompt that produced a generated asset. */
   prompt?: string;

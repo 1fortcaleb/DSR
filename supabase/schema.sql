@@ -173,9 +173,15 @@ $$;
 -- every other room's data stay behind: this function is the boundary, not the
 -- client. Their own flags come back so their page reflects what they said;
 -- other recipients' flags do not.
-create or replace function public.get_shared_room(p_token text)
+-- What a link is allowed to reach, in one place.
+--
+-- Both the room payload and the file-signing path start here, so the two can
+-- never come to different conclusions about the same token. When they can, the
+-- failure is silent and it is always in the same direction: the list hides a
+-- document and the file behind it stays fetchable.
+create or replace function public.share_visible(p_token text)
 returns jsonb
-language plpgsql security definer set search_path = public as $$
+language plpgsql stable security definer set search_path = public as $$
 declare
   v_link public.share_links;
   v_room public.rooms;
@@ -189,12 +195,6 @@ begin
   select * into v_room from public.rooms
    where id = v_link.room_id and status = 'live';
   if not found then return null; end if;
-
-  update public.share_links
-     set open_count      = open_count + 1,
-         last_opened_at  = now(),
-         first_opened_at = coalesce(first_opened_at, now())
-   where token = p_token;
 
   -- Curation is enforced here, not in the client. A video the rep pulled out of
   -- the room must not travel in the payload at all: its title and its asset URL
@@ -212,9 +212,9 @@ begin
     from jsonb_array_elements(coalesce(v_room.documents, '[]'::jsonb)) d
    where coalesce((d ->> 'internal')::boolean, false) = false;
 
-  -- Only the assets this room actually references are exposed. Read from the
-  -- filtered lists above, never the raw ones, or a withheld document's file
-  -- travels in the payload anyway.
+  -- Only the assets this room actually references. Read from the filtered
+  -- lists above, never the raw ones, or a withheld document's file becomes
+  -- reachable anyway.
   select array_agg(distinct x) into v_asset_ids from (
     select jsonb_array_elements(v_documents) ->> 'assetId' as x
     union all
@@ -222,6 +222,46 @@ begin
     union all
     select jsonb_array_elements(v_videos) ->> 'videoAssetId'
   ) s where x is not null;
+
+  return jsonb_build_object(
+    'roomId',    v_room.id,
+    'documents', v_documents,
+    'videos',    v_videos,
+    'assetIds',  to_jsonb(coalesce(v_asset_ids, array[]::text[]))
+  );
+end;
+$$;
+
+-- Internal, like resolve_share: it answers questions about a token without
+-- checking who is asking, so nothing but the functions below may call it.
+revoke all on function public.share_visible(text) from anon, authenticated;
+
+create or replace function public.get_shared_room(p_token text)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_link public.share_links;
+  v_room public.rooms;
+  v_visible jsonb;
+  v_videos jsonb;
+  v_documents jsonb;
+  v_asset_ids text[];
+begin
+  v_visible := public.share_visible(p_token);
+  if v_visible is null then return null; end if;
+
+  v_link := public.resolve_share(p_token);
+  select * into v_room from public.rooms where id = v_link.room_id;
+
+  v_documents := v_visible -> 'documents';
+  v_videos    := v_visible -> 'videos';
+  v_asset_ids := array(select jsonb_array_elements_text(v_visible -> 'assetIds'));
+
+  update public.share_links
+     set open_count      = open_count + 1,
+         last_opened_at  = now(),
+         first_opened_at = coalesce(first_opened_at, now())
+   where token = p_token;
 
   return jsonb_build_object(
     'roomId',          v_room.id,
@@ -425,23 +465,53 @@ alter table public.rooms
 -- row keeps the public URL alongside the thumbnail.
 alter table public.assets add column if not exists url text;
 
--- Public-read, with every object under its asset's UUID: unguessable but
--- permanent, the same bargain as an unlisted video link. Anyone holding the
--- exact URL keeps access even after the room's share link is revoked. Right
--- for sales collateral, wrong for anything confidential — for that, make the
--- bucket private and mint short-lived signed URLs from an edge function that
--- checks the share token.
-update storage.buckets set public = true where id = 'assets';
+-- Private.
+--
+-- It was public-read, on the reasoning that an object key under a random UUID
+-- is unguessable — the unlisted-video bargain. The part of that bargain that
+-- does not survive contact with a sales tool is revocation: a public URL keeps
+-- working forever, including after the room's share link is revoked, and a
+-- file that has been forwarded has been forwarded for good.
+--
+-- So the bucket is private and nothing anonymous can read it. A recipient's
+-- files are signed for them on demand by the shared-files function, which
+-- checks their token first and mints URLs that expire within the hour. Revoke
+-- the link and access ends with the current signature rather than never.
+update storage.buckets set public = false where id = 'assets';
 
--- Reps (signed in) manage the objects; everyone can read them.
+-- Reps (signed in) manage the objects. Nobody else reads them directly.
 drop policy if exists assets_rw on storage.objects;
 create policy assets_rw on storage.objects
   for all to authenticated
   using (bucket_id = 'assets') with check (bucket_id = 'assets');
 
 drop policy if exists assets_public_read on storage.objects;
-create policy assets_public_read on storage.objects
-  for select to anon using (bucket_id = 'assets');
+
+-- The stored public URLs stopped working the moment the bucket went private,
+-- and a URL that 404s is worse than no URL: the app falls back to signing only
+-- when there is nothing on the row.
+update public.assets set url = null where url is not null;
+
+-- The paths one link may have signed — the same filter the payload uses, so a
+-- held-back document's file cannot be signed even by someone holding a valid
+-- token for that room.
+create or replace function public.share_asset_paths(p_token text)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_visible jsonb; v_ids text[];
+begin
+  v_visible := public.share_visible(p_token);
+  if v_visible is null then return '[]'::jsonb; end if;
+  v_ids := array(select jsonb_array_elements_text(v_visible -> 'assetIds'));
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', a.id, 'path', a.storage_path))
+      from public.assets a
+     where a.id::text = any(v_ids) and a.storage_path is not null
+  ), '[]'::jsonb);
+end;
+$$;
+
+grant execute on function public.share_asset_paths(text) to anon, authenticated;
 
 /* -------------------------------------------------------------- playbook */
 

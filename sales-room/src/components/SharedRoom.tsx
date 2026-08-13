@@ -4,6 +4,7 @@ import {
   addSharedFlag,
   replyToSharedFlag,
   fetchSharedRoom,
+  fetchSharedFileUrls,
   submitSharedFeedback,
   withdrawSharedFeedback,
   type SharedRoomPayload,
@@ -38,6 +39,8 @@ export function SharedRoom({ token }: { token: string }) {
   >("loading");
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<SharedTab>("case");
+  /** Signed for this recipient, keyed by asset id. Empty until they arrive. */
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -57,6 +60,11 @@ export function SharedRoom({ token }: { token: string }) {
         }
         setPayload(data);
         setState("ready");
+        // After the room, never before it. The bucket is private, so these
+        // have to be signed — but a page that waited on them would show
+        // nothing at all while a document was being authorised, and the
+        // argument is what the reader came for. Tiles fill in when they land.
+        void fetchSharedFileUrls(token).then(setFileUrls);
       })
       .catch((err: unknown) => {
         setError(errText(err));
@@ -189,8 +197,8 @@ export function SharedRoom({ token }: { token: string }) {
   }, [payload, submitFeedback, withdrawFeedback, flagPassage, replyToRedline]);
 
   /* The counterparty's asset context: read-only, and only the assets their own
-     room references. Every one already carries a hosted URL, so nothing here
-     ever touches IndexedDB or the rep-side library. */
+     room references. URLs are signed for this link and expire within the hour,
+     so nothing here ever touches IndexedDB or the rep-side library. */
   const assetsValue: AssetsContextValue = useMemo(() => {
     const assets: Asset[] = (payload?.assets ?? []).map((a) => ({
       id: a.id,
@@ -199,7 +207,7 @@ export function SharedRoom({ token }: { token: string }) {
       mimeType: "",
       sizeBytes: 0,
       thumbnail: a.thumbnail,
-      url: a.url,
+      url: fileUrls[a.id],
       origin: "uploaded",
       createdAt: "",
     }));
@@ -223,7 +231,7 @@ export function SharedRoom({ token }: { token: string }) {
       clearAll: denied,
       dismissError: () => undefined,
     };
-  }, [payload?.assets]);
+  }, [payload?.assets, fileUrls]);
 
   if (state === "loading") {
     return (

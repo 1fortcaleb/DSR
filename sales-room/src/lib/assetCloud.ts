@@ -6,16 +6,15 @@ const BUCKET = "assets";
 /**
  * Asset bytes in Supabase Storage, metadata in Postgres.
  *
- * The bucket is public-read and every object sits under its asset's UUID, so
- * the URL is unguessable but permanent — the same bargain as an unlisted Loom
- * or a share token. It means a file stays reachable to anyone who has its
- * exact URL even after the room's link is revoked. That is the right trade for
- * sales collateral and the wrong one for anything confidential; the fix when
- * it matters is a private bucket plus an edge function that checks the share
- * token and mints a short-lived signed URL.
+ * The bucket is private. Nothing here holds a URL that keeps working: a rep
+ * signs what they are about to open, and a counterparty's files are signed for
+ * them by the shared-files function after it checks their link. Revoking a
+ * share link therefore actually revokes the files, which is the whole reason
+ * this is not a public bucket.
  *
  * The small thumbnail lives on the row as a data URI, so grids and poster
- * frames render without touching Storage at all.
+ * frames render without touching Storage at all — which is why a library of
+ * hundreds of assets costs nothing to browse.
  */
 
 interface AssetRow {
@@ -42,7 +41,9 @@ function toAsset(r: AssetRow): Asset {
     thumbnail: r.thumbnail,
     origin: r.origin,
     ...(r.prompt ? { prompt: r.prompt } : {}),
-    url: r.url ?? undefined,
+    // Deliberately not r.url. Those were public URLs and the bucket is private
+    // now; a stale one would be preferred over signing and would simply fail.
+    storagePath: r.storage_path,
     createdAt: r.created_at,
   };
 }
@@ -73,8 +74,6 @@ export async function putCloudAsset(asset: Asset, blob: Blob): Promise<Asset> {
     .upload(path, blob, { contentType: asset.mimeType, upsert: true });
   if (up.error) throw up.error;
 
-  const { data: pub } = db.storage.from(BUCKET).getPublicUrl(path);
-
   const { data, error } = await db
     .from("assets")
     .upsert({
@@ -85,7 +84,7 @@ export async function putCloudAsset(asset: Asset, blob: Blob): Promise<Asset> {
       mime_type: asset.mimeType,
       size_bytes: asset.sizeBytes,
       storage_path: path,
-      url: pub.publicUrl,
+      url: null,
       thumbnail: asset.thumbnail,
       origin: asset.origin,
       prompt: asset.prompt ?? null,
@@ -109,4 +108,19 @@ export async function deleteCloudAsset(id: string): Promise<void> {
   if (path) await db.storage.from(BUCKET).remove([path]);
   const { error } = await db.from("assets").delete().eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * A URL for one asset, good for the next hour.
+ *
+ * Signed rather than stored, because a stored URL is one that outlives the
+ * reason it was issued. Reps sign their own: they are signed in, and the
+ * storage policy already lets them at the bucket.
+ */
+export async function signCloudAsset(path: string): Promise<string | null> {
+  const { data, error } = await requireSupabase()
+    .storage.from(BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  if (error) return null;
+  return data?.signedUrl ?? null;
 }

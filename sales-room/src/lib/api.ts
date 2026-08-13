@@ -391,3 +391,32 @@ export async function updateFlag(
     .eq("id", id);
   if (error) throw error;
 }
+
+/* ----------------------------------------------------------- shared files */
+
+/**
+ * Short-lived URLs for the files behind a share link.
+ *
+ * The assets bucket is private, so a document or a video has to be signed
+ * before a recipient's browser can fetch it — and it is signed by a route that
+ * checks their token first. Nothing here can widen what they reach: the route
+ * asks the database the same question the room payload does.
+ *
+ * A failure is not fatal. The page, the marks and the verdict all work without
+ * a single file loading, and a room that renders with a broken document tile
+ * is far better than one that refuses to open at all.
+ */
+export async function fetchSharedFileUrls(token: string): Promise<Record<string, string>> {
+  try {
+    const res = await fetch("/.netlify/functions/shared-files", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (!res.ok) return {};
+    const payload = (await res.json()) as { files?: Record<string, string> };
+    return payload.files ?? {};
+  } catch {
+    return {};
+  }
+}
