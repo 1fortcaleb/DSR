@@ -116,9 +116,11 @@ The same applies to claims, not only figures. "Producers rekey every submission"
 
 **headline** — one sentence naming the change that is on offer, in their terms. It is the only line most readers finish. Not a description of 1Fort, not a question, not a slogan.
 
+One sentence, and about 90 characters — 120 at the absolute outside. It is set very large, so a headline that runs past that stops being a headline and becomes the opening paragraph of a page nobody has agreed to read yet. If you find yourself writing a second sentence, the first one is the headline and the second belongs in the approach.
+
 **framing** — five clauses, in order: despite / you still can't / which means / have to / and the cost is. Each 'value' is the bracketed part, and it should read as their situation described back to them, specific enough that a competitor's prospect would not recognise themselves in it. Keep the 'lead' text exactly as given; you are writing only the values.
 
-Keep each value short: about 45 characters, and never more than 60. It is set large, in monospace, on a narrow column, and the five clauses are meant to be read as a ladder of five lines. A value that needs a comma and a second half is two ideas, and the second one belongs in the approach or the outcomes rather than here.
+Keep each value short: about 40 characters, and never more than 55. The lead is part of the same line and eats into that — "WE STILL CAN'T" is fifteen characters before you have written anything. The five clauses are set large and in monospace, and they are meant to be read as a ladder of five lines. A value that needs a comma and a second half is two ideas, and the second one belongs in the approach or the outcomes rather than here.
 
 **stats** — up to four figures from the sources, chosen because they carry the argument, not because they are the four you found. 'value' is the number as written ("11.5", "$1.4M", "1 in 3"), 'unit' is the trailing word if there is one ("days", "portals") and empty otherwise. 'label' says what the figure measures, in the fewest words that stay unambiguous. Use accent "red" for a figure that represents loss or delay, "navy" otherwise. Leave any stat you cannot source exactly as it came to you.
 

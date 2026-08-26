@@ -40,6 +40,36 @@ export function CaseView({ audience }: CaseViewProps) {
   // Buyers see the same page, rendered inert.
   const ro = !isRep;
 
+  /*
+    Two places where the design assumed short text and the model writes long.
+
+    The headline was drawn at one size for a line the placeholder kept to a
+    dozen words. A real one can run to three times that, and at 40px that is a
+    six-line wall the reader meets before anything else — the opposite of what
+    a headline is for. It steps down as it lengthens, so a long one is still
+    read as a headline rather than as an opening paragraph.
+
+    The framing ladder is monospace, so how much fits is arithmetic rather than
+    guesswork: every glyph is 0.6em wide. Sizing off the longest of the five
+    lines keeps all five on one line each, which is the whole shape of that
+    section — five clauses, five rungs. It is measured against the container
+    rather than the window, so the narrow preview pane in Manage gets the same
+    treatment as the full-width page.
+  */
+  const headlineSize =
+    content.headline.length > 150
+      ? "26px"
+      : content.headline.length > 100
+        ? "31px"
+        : content.headline.length > 62
+          ? "35px"
+          : "40px";
+
+  const longestRung = Math.max(
+    ...content.framing.map((l) => `${l.lead} ${l.value}`.length + 1),
+    1,
+  );
+
   return (
     <div className="flex flex-wrap items-start">
       <div className="box-border flex flex-1 min-w-0 basis-[560px] justify-center px-10 pt-11 pb-[88px]">
@@ -72,7 +102,8 @@ export function CaseView({ audience }: CaseViewProps) {
               value={content.headline}
               onChange={(v) => setField("headline", v)}
               ariaLabel="Headline"
-              className="m-0 max-w-[15em] text-[40px] leading-[1.1] tracking-[-0.025em] font-bold text-navy"
+              style={{ fontSize: headlineSize }}
+              className="m-0 max-w-[15em] leading-[1.1] tracking-[-0.025em] font-bold text-navy"
             />
             <div className="h-1 w-[30px] rounded-full bg-blue" />
           </header>
@@ -87,39 +118,55 @@ export function CaseView({ audience }: CaseViewProps) {
               className="font-mono text-[10px] tracking-[0.14em] text-blue uppercase"
             />
             {/*
-              The ladder is designed as five one-line clauses, and it reads best
-              when each stays on its line — but "stays on its line" cannot be
-              enforced by refusing to wrap. A value longer than the column then
-              runs off the page and out of the PDF, which is how a rep sends a
-              one-pager with half a sentence missing and never sees it. So it
-              wraps, and a hanging indent makes a wrapped clause read as the
-              continuation it is rather than as a sixth line of the ladder.
+              Sized to the longest of the five clauses so every one of them
+              holds its own line. Monospace makes that arithmetic rather than
+              guesswork — each glyph is 0.6em — and cqw measures the column
+              this actually sits in, so the narrow preview pane in Manage is
+              handled as well as the full-width page.
+
+              Bounded at both ends. It never grows past the 21px the section
+              was drawn at, and it never shrinks below legible; past that the
+              text wraps instead, with a hanging indent so a wrapped clause
+              reads as the continuation it is rather than as a sixth rung.
+              Wrapping is the floor, not the plan: a clause that runs off the
+              edge of the page is gone from the PDF too, which is how a rep
+              sends half a sentence and never sees it.
             */}
-            <div className="flex flex-col gap-0.5 font-mono text-[21px] leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase">
-              {content.framing.map((line) => (
-                <div key={line.id} className="pl-[1.4em] indent-[-1.4em] break-words">
-                  <EditableText
-                    readOnly={ro}
-                    value={line.lead}
-                    onChange={(v) =>
-                      setListItem("framing", line.id, { lead: v })
-                    }
-                    inline
-                    ariaLabel={`Framing lead: ${line.lead}`}
-                  />{" "}
-                  <EditableText
-                    readOnly={ro}
-                    value={line.value}
-                    onChange={(v) =>
-                      setListItem("framing", line.id, { value: v })
-                    }
-                    inline
-                    ariaLabel={`Framing value: ${line.lead}`}
-                    className="text-blue"
-                  />
-                  {line.id === "cost" ? "." : ""}
-                </div>
-              ))}
+            <div style={{ containerType: "inline-size" }}>
+              <div
+                style={{
+                  fontSize: `clamp(12px, calc(100cqw / ${(longestRung * 0.6).toFixed(1)}), 21px)`,
+                }}
+                className="flex flex-col gap-0.5 font-mono leading-[1.62] tracking-[-0.01em] text-gray-900 uppercase"
+              >
+                {content.framing.map((line) => (
+                  <div
+                    key={line.id}
+                    className="pl-[1.4em] indent-[-1.4em] break-words"
+                  >
+                    <EditableText
+                      readOnly={ro}
+                      value={line.lead}
+                      onChange={(v) =>
+                        setListItem("framing", line.id, { lead: v })
+                      }
+                      inline
+                      ariaLabel={`Framing lead: ${line.lead}`}
+                    />{" "}
+                    <EditableText
+                      readOnly={ro}
+                      value={line.value}
+                      onChange={(v) =>
+                        setListItem("framing", line.id, { value: v })
+                      }
+                      inline
+                      ariaLabel={`Framing value: ${line.lead}`}
+                      className="text-blue"
+                    />
+                    {line.id === "cost" ? "." : ""}
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 

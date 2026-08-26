@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ElementType,
   type KeyboardEvent,
   type Ref,
@@ -36,6 +37,13 @@ interface EditableTextProps {
    * statement about the deal.
    */
   placeholder?: string;
+  /**
+   * Inline styles the caller computes from the content itself — type that
+   * steps down as the text lengthens, for instance. Applied to the editing
+   * field as well as the display element, so a field never opens at a
+   * different size from the text it replaced.
+   */
+  style?: CSSProperties;
   ariaLabel?: string;
 }
 
@@ -58,6 +66,7 @@ export function EditableText({
   multiline = false,
   readOnly = false,
   placeholder,
+  style,
   ariaLabel,
 }: EditableTextProps) {
   /** An em-dash is the templates' way of saying "not filled in yet". */
@@ -168,6 +177,7 @@ export function EditableText({
           aria-label={ariaLabel}
           className={`${fieldClass} max-w-full align-baseline`}
           style={{
+            ...style,
             width: `${Math.max(draft.length, 1) + 1.5}ch`,
             height: boxHeight ?? undefined,
             lineHeight: box?.lineHeight,
@@ -186,7 +196,7 @@ export function EditableText({
         onBlur={commit}
         onKeyDown={handleKeyDown}
         aria-label={ariaLabel}
-        style={{ lineHeight: box?.lineHeight }}
+        style={{ ...style, lineHeight: box?.lineHeight }}
         className={`${fieldClass} block w-[calc(100%+0.5rem)] resize-none overflow-hidden`}
       />
     );
@@ -205,6 +215,7 @@ export function EditableText({
       }}
       aria-label={ariaLabel ?? "Click to edit"}
       title="Click to edit"
+      style={style}
       className={`${className} cursor-text rounded-sm px-1 -mx-1 transition-colors hover:bg-blue-bg focus-visible:bg-blue-bg`}
     >
       {unfilled && placeholder ? (
